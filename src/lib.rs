@@ -1,23 +1,57 @@
-use std::collections::HashMap;
+mod error;
+mod log;
+pub use error::{Error, Result};
+use log::Logger;
+use std::{collections::HashMap, path::Path};
 
+/// Used to store key and value
+/// # Example
+///
+/// ```
+/// let mut kvs = KvStore::new();
+/// kvs.set("key".to_string(), "value".to_string());
+/// assert_eq!(kvs.get("key".to_string()),"value".to_string());
+/// ```
 pub struct KvStore {
     map: HashMap<String, String>,
+    logger: Logger,
 }
+
 impl KvStore {
-    pub fn new() -> KvStore {
+    /// new a key-value store
+    /// ```
+    /// ```
+    pub fn open(path: &Path) -> Result<KvStore> {
+        let path = path.join("kvs.db");
+
         let map = HashMap::new();
-        KvStore { map }
+        let logger = Logger::new(path)?;
+
+        Ok(KvStore { map, logger })
     }
-    pub fn set(&mut self, key: String, value: String) {
+    /// set the value of a given key
+    /// ```
+    /// ```
+    pub fn set(&mut self, key: String, value: String) -> Result<()> {
         self.map.insert(key, value);
+        Ok(())
     }
-    pub fn get(&self, key: String) -> Option<String> {
-        match self.map.get(&key) {
+    /// set the value of a given key
+    /// ```
+    /// ```
+    pub fn get(&self, key: String) -> Result<Option<String>> {
+        Ok(match self.map.get(&key) {
             Some(v) => Some(v.to_owned()),
-            None => None,
-        }
+            None => {
+                eprintln!("key not found");
+                None
+            }
+        })
     }
-    pub fn remove(&mut self, key: String) -> Option<String> {
-        self.map.remove(&key)
+    /// remove a given key in store
+    /// ```
+    /// ```
+    pub fn remove(&mut self, key: String) -> Result<Option<String>> {
+        Ok(self.map.remove(&key))
     }
 }
