@@ -1,5 +1,5 @@
 mod error;
-mod log;
+pub mod log;
 pub use error::{Error, Result};
 use log::Logger;
 use std::{collections::HashMap, path::Path};
@@ -33,15 +33,19 @@ impl KvStore {
     /// ```
     /// ```
     pub fn set(&mut self, key: String, value: String) -> Result<()> {
-        self.map.insert(key, value);
+        self.map.insert(key.to_owned(), value.to_owned());
+        self.logger.append(format!("set,{},{}", key, value))?;
         Ok(())
     }
     /// set the value of a given key
     /// ```
     /// ```
-    pub fn get(&self, key: String) -> Result<Option<String>> {
+    pub fn get(&mut self, key: String) -> Result<Option<String>> {
         Ok(match self.map.get(&key) {
-            Some(v) => Some(v.to_owned()),
+            Some(v) => {
+                self.logger.append(format!("get,{}", key))?;
+                Some(v.to_owned())
+            }
             None => {
                 eprintln!("key not found");
                 None

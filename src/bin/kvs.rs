@@ -1,6 +1,10 @@
-use std::process;
-
 use clap::{crate_authors, crate_version, App, Arg, ArgMatches, Clap};
+use kvs::{log::Logger, KvStore};
+use std::{
+    path::{Path, PathBuf},
+    process,
+};
+
 #[derive(Clap)]
 #[clap(version =crate_version!() , author = crate_authors!())]
 struct Options {
@@ -24,7 +28,7 @@ struct KeyValue {
 }
 fn main() {
     let opts = Options::parse();
-
+    let mut kvs = KvStore::open(Path::new("")).unwrap();
     match opts.subcmd {
         SubCommand::Get(m) => {
             eprint!("unimplemented");
@@ -35,8 +39,26 @@ fn main() {
             process::exit(1);
         }
         SubCommand::Set(m) => {
-            eprint!("unimplemented");
-            process::exit(1);
+            // eprint!("unimplemented");
+            kvs.set(m.key, m.value).unwrap();
+        }
+    }
+}
+
+fn write() {
+    let path = PathBuf::from("a.db");
+
+    match Logger::new(path) {
+        Ok(mut log) => match log.append("123".to_string()) {
+            Ok(()) => {
+                println!("ok");
+            }
+            Err(e) => {
+                println!("{}", e);
+            }
+        },
+        Err(e) => {
+            println!("{}", e);
         }
     }
 }

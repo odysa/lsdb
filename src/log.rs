@@ -20,6 +20,7 @@ impl Logger {
     }
 
     pub fn append(&mut self, content: String) -> Result<()> {
+        let content = content + "\n";
         if let Err(e) = self.writer.write(content.as_bytes()) {
             eprintln!("error to write, {}", e);
             Err(Error::from(e))
@@ -40,8 +41,10 @@ fn new_db(file_path: &PathBuf) -> Result<(BufReader<File>, BufWriter<File>)> {
         .append(true)
         .create(true)
         .open(&file_path)?;
-
-    let read_file = OpenOptions::new().write(false).open(&file_path)?;
+    let read_file = OpenOptions::new()
+        .write(false)
+        .read(true)
+        .open(&file_path)?;
     let writer = BufWriter::new(write_file);
     let reader = BufReader::new(read_file);
     Ok((reader, writer))
