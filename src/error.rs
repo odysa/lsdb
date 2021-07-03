@@ -12,6 +12,15 @@ pub struct Error {
 pub enum ErrorKind {
     #[fail(display = "{}", _0)]
     IO(#[cause] io::Error),
+
+    #[fail(display = "{}", _0)]
+    InvalidLog(String),
+
+    #[fail(display = "{}", _0)]
+    KeyNotFound(String),
+
+    #[fail(display = "{}", _0)]
+    KeyNotExist(String),
 }
 
 impl Display for Error {

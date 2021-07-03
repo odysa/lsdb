@@ -1,9 +1,6 @@
-use clap::{crate_authors, crate_version, App, Arg, ArgMatches, Clap};
-use kvs::{log::Logger, KvStore};
-use std::{
-    path::{Path, PathBuf},
-    process,
-};
+use clap::{crate_authors, crate_version, Clap};
+use kvs::KvStore;
+use std::{path::Path, process};
 
 #[derive(Clap)]
 #[clap(version =crate_version!() , author = crate_authors!())]
@@ -30,35 +27,28 @@ fn main() {
     let opts = Options::parse();
     let mut kvs = KvStore::open(Path::new("")).unwrap();
     match opts.subcmd {
-        SubCommand::Get(m) => {
-            eprint!("unimplemented");
-            process::exit(1);
-        }
-        SubCommand::RM(m) => {
-            eprint!("unimplemented");
-            process::exit(1);
-        }
-        SubCommand::Set(m) => {
-            // eprint!("unimplemented");
-            kvs.set(m.key, m.value).unwrap();
-        }
-    }
-}
-
-fn write() {
-    let path = PathBuf::from("a.db");
-
-    match Logger::new(path) {
-        Ok(mut log) => match log.append("123".to_string()) {
-            Ok(()) => {
-                println!("ok");
+        SubCommand::Get(m) => match kvs.get(m.key) {
+            Ok(Some(value)) => {
+                println!("{}", value);
             }
-            Err(e) => {
-                println!("{}", e);
+            _ => {
+                println!("Key not found");
+                process::exit(0);
             }
         },
-        Err(e) => {
-            println!("{}", e);
-        }
+        SubCommand::RM(m) => match kvs.remove(m.key) {
+            Ok(_) => {}
+            _ => {
+                println!("Key not found");
+                process::exit(-1);
+            }
+        },
+        SubCommand::Set(m) => match kvs.set(m.key, m.value) {
+            Ok(_) => {}
+            Err(e) => {
+                println!("{}", e);
+                process::exit(-1);
+            }
+        },
     }
 }

@@ -1,6 +1,6 @@
 mod error;
 pub mod log;
-pub use error::{Error, Result};
+pub use error::{Error, ErrorKind, Result};
 use log::Logger;
 use std::{collections::HashMap, path::Path};
 
@@ -34,28 +34,50 @@ impl KvStore {
     /// ```
     pub fn set(&mut self, key: String, value: String) -> Result<()> {
         self.map.insert(key.to_owned(), value.to_owned());
-        self.logger.append(format!("set,{},{}", key, value))?;
+        self.logger.log_set(&key, &value)?;
         Ok(())
     }
     /// set the value of a given key
     /// ```
     /// ```
     pub fn get(&mut self, key: String) -> Result<Option<String>> {
-        Ok(match self.map.get(&key) {
-            Some(v) => {
-                self.logger.append(format!("get,{}", key))?;
-                Some(v.to_owned())
+        if let Some(v) = self.map.get(&key) {
+            return Ok(Some(v.to_owned()));
+        }
+        match self.logger.get_value(&key) {
+            Ok(res) => {
+                if let Some(value) = res {
+                    Ok(Some(value))
+                } else {
+                    Ok(None)
+                }
             }
-            None => {
-                eprintln!("key not found");
-                None
-            }
-        })
+            Err(e) => Err(e),
+        }
     }
     /// remove a given key in store
     /// ```
     /// ```
-    pub fn remove(&mut self, key: String) -> Result<Option<String>> {
-        Ok(self.map.remove(&key))
+    pub fn remove(&mut self, key: String) -> Result<String> {
+        self.map.remove(&key).unwrap_or_default();
+
+        match self.logger.get_value(&key) {
+            Ok(res) => match res {
+                None => Err(Error::from(ErrorKind::KeyNotExist(format!(
+                    "key {} you want to remove does not exist",
+                    key
+                )))),
+                Some(value) => {
+                    self.logger.log_rem(&key)?;
+                    Ok(value)
+                }
+            },
+            Err(e) => Err(e),
+        }
     }
+}
+#[derive(Debug)]
+pub enum Command {
+    Set,
+    Rem,
 }

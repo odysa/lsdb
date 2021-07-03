@@ -2,6 +2,7 @@ use assert_cmd::prelude::*;
 use kvs::{KvStore, Result};
 use predicates::ord::eq;
 use predicates::str::{contains, is_empty, PredicateStrExt};
+use std::path::Path;
 use std::process::Command;
 use tempfile::TempDir;
 use walkdir::WalkDir;
@@ -181,6 +182,7 @@ fn cli_invalid_subcommand() {
 #[test]
 fn get_stored_value() -> Result<()> {
     let temp_dir = TempDir::new().expect("unable to create temporary working directory");
+    // let temp_dir = Path::new("");
     let mut store = KvStore::open(temp_dir.path())?;
 
     store.set("key1".to_owned(), "value1".to_owned())?;
@@ -249,6 +251,7 @@ fn remove_key() -> Result<()> {
     let temp_dir = TempDir::new().expect("unable to create temporary working directory");
     let mut store = KvStore::open(temp_dir.path())?;
     store.set("key1".to_owned(), "value1".to_owned())?;
+
     assert!(store.remove("key1".to_owned()).is_ok());
     assert_eq!(store.get("key1".to_owned())?, None);
     Ok(())
