@@ -129,7 +129,7 @@ impl LogWriter {
 
         Ok(())
     }
-    
+
     fn compact(&mut self) -> Result<()> {
         println!("unimplemented!");
         Ok(())
