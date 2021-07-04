@@ -80,6 +80,7 @@ impl Logger {
             eprintln!("error to write, {}", e);
             Err(Error::from(e))
         } else {
+            self.writer.flush()?;
             Ok(())
         }
     }
@@ -105,4 +106,74 @@ fn new_db(file_path: &Path) -> Result<(BufReader<File>, BufWriter<File>)> {
     let writer = BufWriter::new(write_file);
     let reader = BufReader::new(read_file);
     Ok((reader, writer))
+}
+
+struct LogWriter {
+    writer: PosWriter<File>,
+    // length of content which is not compacted
+    wild: u64,
+}
+
+impl LogWriter {
+    fn new(writer: PosWriter<File>) -> LogWriter {
+        LogWriter { writer, wild: 0 }
+    }
+
+    fn append(&mut self, content: String) -> Result<()> {
+        let pos = self.writer.pos;
+        self.writer.write(content.as_bytes())?;
+        let new_pos = self.writer.pos;
+
+        let offset = OffSet::new(pos, new_pos);
+        self.wild += offset.len;
+
+        Ok(())
+    }
+    
+    fn compact(&mut self) -> Result<()> {
+        println!("unimplemented!");
+        Ok(())
+    }
+}
+
+struct PosWriter<T: Write + Seek> {
+    writer: BufWriter<T>,
+    pos: u64,
+}
+
+impl<T: Write + Seek> PosWriter<T> {
+    fn new(mut writer: BufWriter<T>) -> Result<Self> {
+        let pos = writer.seek(SeekFrom::End(0))?;
+        Ok(PosWriter { writer, pos })
+    }
+
+    fn write(&mut self, content: &[u8]) -> Result<u64> {
+        self.pos += self.writer.write(content)? as u64;
+        Ok(self.pos)
+    }
+
+    fn flush(&mut self) -> Result<()> {
+        Ok(self.writer.flush()?)
+    }
+}
+
+impl<T: Seek + Write> Seek for PosWriter<T> {
+    fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
+        self.pos = self.writer.seek(pos)?;
+        Ok(self.pos)
+    }
+}
+
+struct OffSet {
+    start: u64,
+    len: u64,
+}
+
+impl OffSet {
+    fn new(start: u64, end: u64) -> OffSet {
+        OffSet {
+            start,
+            len: end - start,
+        }
+    }
 }
