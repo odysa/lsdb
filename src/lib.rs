@@ -8,9 +8,11 @@ use std::{collections::HashMap, path::Path};
 /// # Example
 ///
 /// ```
-/// let mut kvs = KvStore::new();
+/// use kvs::KvStore;
+/// use std::path::Path;
+/// let mut kvs = KvStore::open(&Path::new("")).unwrap();
 /// kvs.set("key".to_string(), "value".to_string());
-/// assert_eq!(kvs.get("key".to_string()),"value".to_string());
+/// assert_eq!(kvs.get("key".to_string()).unwrap(), Some("value".to_string()));
 /// ```
 pub struct KvStore {
     map: HashMap<String, String>,

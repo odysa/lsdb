@@ -1,0 +1,49 @@
+name: CI
+on:
+  push:
+    branches: [master, ci]
+  pull_request:
+
+jobs:
+  test:
+    name: Test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        build: [stable, beta, nightly, macos, windows, msrv]
+        include:
+          - build: stable
+            os: ubuntu-latest
+            rust: stable
+          - build: beta
+            os: ubuntu-latest
+            rust: beta
+          - build: nightly
+            os: ubuntu-latest
+            rust: nightly
+          - build: macos
+            os: macos-latest
+            rust: stable
+          - build: windows
+            os: windows-latest
+            rust: stable
+          - build: msrv
+            os: ubuntu-latest
+            rust: 1.45.0
+    steps:
+    - uses: actions/checkout@master
+    - name: Install Rust
+      run: bash ci/install-rust.sh ${{ matrix.rust }}
+    - name: Build and run tests
+      run: cargo test
+    - name: Test no default
+      run: cargo test --no-default-features
+
+  rustClippy:
+    name: RustClippy
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    - name: Install Rust
+      run: rustup update stable && rustup default stable && rustup component add clippy
+    - run: cargo clippy
