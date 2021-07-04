@@ -1,5 +1,5 @@
 use crate::error::{Error, ErrorKind, Result};
-use crate::Command;
+use crate::{Command, DataMaintainer};
 use std::fs::{File, OpenOptions};
 use std::io::{prelude::*, BufReader, BufWriter, SeekFrom};
 use std::path::{Path, PathBuf};
@@ -19,39 +19,6 @@ impl Logger {
             writer,
             reader,
         })
-    }
-    pub fn log_set(&mut self, key: &str, value: &str) -> Result<()> {
-        self.append(format!("set,{},{}", key, value))?;
-        Ok(())
-    }
-    pub fn log_rem(&mut self, key: &str) -> Result<()> {
-        self.append(format!("rem,{}", key))?;
-        Ok(())
-    }
-    /// get value by given key
-    pub fn get_value(&mut self, key: &str) -> Result<Option<String>> {
-        let content = self.read_to_string()?;
-        for line in content.lines().rev() {
-            if line.is_empty() || line == "\n" {
-                continue;
-            }
-            if let Some(res) = self.deserialize_log(line) {
-                let (cmd, log_key, log_value) = res;
-                if log_key != key {
-                    continue;
-                }
-                match cmd {
-                    Command::Set => return Ok(Some(log_value)),
-                    Command::Rem => return Ok(None),
-                }
-            } else {
-                return Err(Error::from(ErrorKind::InvalidLog(format!(
-                    "invalid log {}",
-                    line
-                ))));
-            }
-        }
-        Ok(None)
     }
     /// deserialize log
     fn deserialize_log(&self, line: &str) -> Option<(Command, String, String)> {
@@ -90,6 +57,43 @@ impl Logger {
         self.reader.seek(SeekFrom::Start(0))?;
         self.reader.read_to_string(&mut result)?;
         Ok(result)
+    }
+}
+
+impl DataMaintainer for Logger {
+    fn set(&mut self, key: &str, value: &str) -> Result<()> {
+        self.append(format!("set,{},{}", key, value))?;
+        Ok(())
+    }
+
+    fn rem(&mut self, key: &str) -> Result<()> {
+        self.append(format!("rem,{}", key))?;
+        Ok(())
+    }
+
+    fn get(&mut self, key: &str) -> Result<Option<String>> {
+        let content = self.read_to_string()?;
+        for line in content.lines().rev() {
+            if line.is_empty() || line == "\n" {
+                continue;
+            }
+            if let Some(res) = self.deserialize_log(line) {
+                let (cmd, log_key, log_value) = res;
+                if log_key != key {
+                    continue;
+                }
+                match cmd {
+                    Command::Set => return Ok(Some(log_value)),
+                    Command::Rem => return Ok(None),
+                }
+            } else {
+                return Err(Error::from(ErrorKind::InvalidLog(format!(
+                    "invalid log {}",
+                    line
+                ))));
+            }
+        }
+        Ok(None)
     }
 }
 
