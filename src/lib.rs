@@ -1,8 +1,11 @@
 mod error;
 pub mod log;
+mod log_reader;
+mod log_writer;
 pub use error::{Error, ErrorKind, Result};
 use log::Logger;
-use std::{collections::HashMap, hash::Hash, path::Path};
+use serde::{Deserialize, Serialize};
+use std::{collections::HashMap, path::Path};
 
 /// Used to store key and value
 /// # Example
@@ -84,10 +87,10 @@ impl<T: DataMaintainer> KvStore<T> {
         }
     }
 }
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum Command {
-    Set,
-    Rem,
+    Set { key: String, value: String },
+    Rem { key: String },
 }
 
 pub trait DataMaintainer {
