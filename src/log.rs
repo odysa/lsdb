@@ -7,9 +7,7 @@ use std::collections::HashMap;
 use std::fs::OpenOptions;
 use std::io::{BufReader, BufWriter, SeekFrom};
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 pub struct Logger {
-    path: Arc<PathBuf>,
     writer: LogWriter,
     reader: LogReader,
     index: HashMap<String, OffSet>,
@@ -21,20 +19,17 @@ impl Logger {
         let index = HashMap::new();
 
         let mut logger = Logger {
-            path: Arc::new(path),
             writer,
             reader,
             index,
         };
         logger.load_from_db()?;
-
         Ok(logger)
     }
 
     fn new_db(file_path: &Path) -> Result<(LogReader, LogWriter)> {
         let write_file = OpenOptions::new()
             .write(true)
-            .append(true)
             .create(true)
             .open(&file_path)?;
         let read_file = OpenOptions::new()
@@ -54,15 +49,14 @@ impl Logger {
     fn load_from_db(&mut self) -> Result<()> {
         let mut pos = self.reader.seek(SeekFrom::Start(0))?;
         let reader = self.reader.reader();
-
         let mut stream = Deserializer::from_reader(reader).into_iter::<Command>();
 
         while let Some(cmd) = stream.next() {
             let new_pos = stream.byte_offset() as u64;
-
             match cmd? {
-                Command::Set { key, value: _ } => {
-                    self.index.insert(key, OffSet::new(pos, new_pos));
+                Command::Set { key, value } => {
+                    self.index
+                        .insert(key, OffSet::new(pos, new_pos, Some(value)));
                 }
                 Command::Rem { key } => {
                     self.index.remove(&key);
@@ -70,6 +64,29 @@ impl Logger {
             }
             pos = new_pos;
         }
+
+        Ok(())
+    }
+
+    fn compact(&mut self) -> Result<()> {
+        self.writer.seek(SeekFrom::Start(0))?;
+        let map = self.index.clone();
+        self.writer.reset()?;
+
+        for (key, offset) in map.into_iter() {
+            if let Some(value) = offset.value() {
+                let new_offset = self.writer.write_buffer(Command::Set {
+                    key: key.to_owned(),
+                    value,
+                })?;
+                self.index.insert(key, new_offset);
+            } else {
+                self.index.remove(&key);
+            }
+        }
+
+        // println!("compacting!!!!");
+        self.writer.flush()?;
 
         Ok(())
     }
@@ -84,6 +101,11 @@ impl KvsEngine for Logger {
         let offset = self.writer.write(command)?;
         // update pointer of this command
         self.index.insert(key, offset);
+
+        if self.writer.should_compact() {
+            self.compact()?;
+        }
+
         Ok(())
     }
 
@@ -104,6 +126,10 @@ impl KvsEngine for Logger {
 
     fn get(&mut self, key: String) -> Result<Option<String>> {
         if let Some(offset) = self.index.get(&key) {
+            if let Some(value) = offset.value() {
+                return Ok(Some(value));
+            }
+
             match self.reader.read(offset)? {
                 Command::Set {
                     key: log_key,

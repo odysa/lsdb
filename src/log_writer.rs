@@ -2,6 +2,7 @@ use crate::error::Result;
 use crate::Command;
 use std::fs::File;
 use std::io::{BufWriter, Seek, SeekFrom, Write};
+
 pub struct LogWriter {
     writer: PosWriter<File>,
     // length of content which is not compacted
@@ -9,31 +10,60 @@ pub struct LogWriter {
 }
 
 impl LogWriter {
+    const COMPACT_THRESHOLD: u64 = 1 * 10 * 1024;
+
     pub fn new(writer: BufWriter<File>) -> Result<LogWriter> {
         let writer = PosWriter::new(writer)?;
         Ok(LogWriter { writer, wild: 0 })
     }
 
+    pub fn flush(&mut self) -> Result<()> {
+        Ok(self.writer.flush()?)
+    }
+
     pub fn write(&mut self, command: Command) -> Result<OffSet> {
+        self.write_base(command, false)
+    }
+
+    pub fn write_buffer(&mut self, command: Command) -> Result<OffSet> {
+        self.write_base(command, true)
+    }
+
+    fn write_base(&mut self, command: Command, is_buffer: bool) -> Result<OffSet> {
         let pos = self.writer.pos;
-        self.serialize(command)?;
+        self.serialize(&command)?;
 
         let new_pos = self.writer.pos;
-        let offset = OffSet::new(pos, new_pos);
+
+        let offset = match command {
+            Command::Set { key: _, value } => OffSet::new(pos, new_pos, Some(value)),
+            Command::Rem { key: _ } => OffSet::new(pos, new_pos, None),
+        };
+
         self.wild += offset.len;
 
-        self.writer.flush()?;
+        if !is_buffer {
+            self.writer.flush()?;
+        }
 
         Ok(offset)
     }
 
-    fn serialize(&mut self, cmd: Command) -> Result<()> {
-        Ok(serde_json::to_writer(&mut self.writer, &cmd)?)
+    pub fn seek(&mut self, pos: SeekFrom) -> Result<u64> {
+        Ok(self.writer.seek(pos)?)
     }
 
-    fn compact(&mut self) -> Result<()> {
-        println!("unimplemented!");
-        Ok(())
+    pub fn reset(&mut self) -> Result<u64> {
+        self.wild = 0;
+        Ok(self.writer.reset()?)
+    }
+
+    pub fn should_compact(&self) -> bool {
+        self.wild >= Self::COMPACT_THRESHOLD
+    }
+
+    fn serialize(&mut self, cmd: &Command) -> Result<()> {
+        Ok(serde_json::to_writer(&mut self.writer, cmd)?)
     }
 }
 struct PosWriter<T: Write + Seek> {
@@ -49,6 +79,10 @@ impl<T: Write + Seek> PosWriter<T> {
 
     fn flush(&mut self) -> Result<()> {
         Ok(self.writer.flush()?)
+    }
+
+    fn reset(&mut self) -> Result<u64> {
+        Ok(self.seek(SeekFrom::Start(0))?)
     }
 }
 
@@ -74,13 +108,25 @@ impl<T: Write + Seek> Write for PosWriter<T> {
 pub struct OffSet {
     start: u64,
     len: u64,
+    value: Option<String>,
+}
+
+impl Clone for OffSet {
+    fn clone(&self) -> Self {
+        OffSet {
+            start: self.start,
+            len: self.len,
+            value: self.value.to_owned(),
+        }
+    }
 }
 
 impl OffSet {
-    pub fn new(start: u64, end: u64) -> OffSet {
+    pub fn new(start: u64, end: u64, value: Option<String>) -> OffSet {
         OffSet {
             start,
             len: end - start,
+            value,
         }
     }
 
@@ -90,5 +136,9 @@ impl OffSet {
 
     pub fn len(&self) -> u64 {
         self.len
+    }
+
+    pub fn value(&self) -> Option<String> {
+        self.value.to_owned()
     }
 }
