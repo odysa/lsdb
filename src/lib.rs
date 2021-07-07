@@ -19,7 +19,7 @@ use std::{collections::HashMap, path::Path};
 /// kvs.set("key".to_string(), "value".to_string()).unwrap();
 /// assert_eq!(kvs.get("key".to_string()).unwrap(),Some("value".to_string()));
 /// ```
-pub struct KvStore<T: DataMaintainer> {
+pub struct KvStore<T: KvsEngine> {
     map: HashMap<String, String>,
     maintainer: T,
 }
@@ -35,7 +35,7 @@ impl KvStore<Logger> {
     }
 }
 
-impl<T: DataMaintainer> KvStore<T> {
+impl<T: KvsEngine> KvStore<T> {
     /// new a key-value store
     /// ```
     /// ```
@@ -45,7 +45,7 @@ impl<T: DataMaintainer> KvStore<T> {
     /// ```
     pub fn set(&mut self, key: String, value: String) -> Result<()> {
         self.map.insert(key.to_owned(), value.to_owned());
-        self.maintainer.set(&key, &value)?;
+        self.maintainer.set(key, value)?;
         Ok(())
     }
     /// set the value of a given key
@@ -55,7 +55,7 @@ impl<T: DataMaintainer> KvStore<T> {
         if let Some(v) = self.map.get(&key) {
             return Ok(Some(v.to_owned()));
         }
-        match self.maintainer.get(&key) {
+        match self.maintainer.get(key) {
             Ok(res) => {
                 if let Some(value) = res {
                     Ok(Some(value))
@@ -72,14 +72,14 @@ impl<T: DataMaintainer> KvStore<T> {
     pub fn remove(&mut self, key: String) -> Result<String> {
         self.map.remove(&key).unwrap_or_default();
 
-        match self.maintainer.get(&key) {
+        match self.maintainer.get(key.to_owned()) {
             Ok(res) => match res {
-                None => Err(Error::from(ErrorKind::KeyNotExist(format!(
+                None => Err(Error::key_not_found(format!(
                     "key {} you want to remove does not exist",
                     key
-                )))),
+                ))),
                 Some(value) => {
-                    self.maintainer.rem(&key)?;
+                    self.maintainer.remove(key)?;
                     Ok(value)
                 }
             },
@@ -93,8 +93,8 @@ pub enum Command {
     Rem { key: String },
 }
 
-pub trait DataMaintainer {
-    fn get(&mut self, key: &str) -> Result<Option<String>>;
-    fn set(&mut self, key: &str, value: &str) -> Result<()>;
-    fn rem(&mut self, key: &str) -> Result<()>;
+pub trait KvsEngine {
+    fn get(&mut self, key: String) -> Result<Option<String>>;
+    fn set(&mut self, key: String, value: String) -> Result<()>;
+    fn remove(&mut self, key: String) -> Result<()>;
 }

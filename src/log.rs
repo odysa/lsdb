@@ -1,118 +1,130 @@
 use crate::error::{Error, ErrorKind, Result};
-use crate::log_writer::OffSet;
-use crate::{Command, DataMaintainer};
+use crate::log_reader::LogReader;
+use crate::log_writer::{LogWriter, OffSet};
+use crate::{Command, KvsEngine};
+use serde_json::Deserializer;
 use std::collections::HashMap;
-use std::fs::{File, OpenOptions};
-use std::io::{prelude::*, BufReader, BufWriter, SeekFrom};
+use std::fs::OpenOptions;
+use std::io::{BufReader, BufWriter, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 pub struct Logger {
     path: Arc<PathBuf>,
-    writer: BufWriter<File>,
-    reader: BufReader<File>,
+    writer: LogWriter,
+    reader: LogReader,
     index: HashMap<String, OffSet>,
 }
 
 impl Logger {
-    pub fn new(path: PathBuf) -> Result<Logger> {
-        let (reader, writer) = new_db(&path)?;
+    pub fn new(path: PathBuf) -> Result<Self> {
+        let (reader, writer) = Self::new_db(&path)?;
         let index = HashMap::new();
-        Ok(Logger {
+
+        let mut logger = Logger {
             path: Arc::new(path),
             writer,
             reader,
             index,
-        })
-    }
-    /// deserialize log
-    fn deserialize_log(&self, line: &str) -> Result<Command> {
-        let mut split = line.split(',');
+        };
+        logger.load_from_db()?;
 
-        let cmd = split.next().unwrap();
-
-        let key: String;
-
-        if let Some(v) = split.next() {
-            key = v.to_owned();
-        } else {
-            return Err(Error::from(ErrorKind::InvalidLog("invalid".to_string())));
-        }
-        // because rem does not need to specify value, we use unwrap_or_default
-        let value = split.next().unwrap_or_default().to_owned();
-
-        match cmd {
-            "set" => Ok(Command::Set { key, value }),
-            "rem" => Ok(Command::Rem { key }),
-            _ => Err(Error::from(ErrorKind::InvalidLog("invalid".to_string()))),
-        }
+        Ok(logger)
     }
 
-    fn append(&mut self, content: String) -> Result<()> {
-        let content = content + "\n";
-        if let Err(e) = self.writer.write(content.as_bytes()) {
-            eprintln!("error to write, {}", e);
-            Err(Error::from(e))
-        } else {
-            self.writer.flush()?;
-            Ok(())
-        }
+    fn new_db(file_path: &Path) -> Result<(LogReader, LogWriter)> {
+        let write_file = OpenOptions::new()
+            .write(true)
+            .append(true)
+            .create(true)
+            .open(&file_path)?;
+        let read_file = OpenOptions::new()
+            .write(false)
+            .read(true)
+            .open(&file_path)?;
+
+        let writer = BufWriter::new(write_file);
+        let writer = LogWriter::new(writer)?;
+
+        let reader = BufReader::new(read_file);
+        let reader = LogReader::new(reader)?;
+
+        Ok((reader, writer))
     }
 
-    fn read_to_string(&mut self) -> Result<String> {
-        let mut result = String::new();
-        self.reader.seek(SeekFrom::Start(0))?;
-        self.reader.read_to_string(&mut result)?;
-        Ok(result)
-    }
-}
+    fn load_from_db(&mut self) -> Result<()> {
+        let mut pos = self.reader.seek(SeekFrom::Start(0))?;
+        let reader = self.reader.reader();
 
-impl DataMaintainer for Logger {
-    fn set(&mut self, key: &str, value: &str) -> Result<()> {
-        self.append(format!("set,{},{}", key, value))?;
-        Ok(())
-    }
+        let mut stream = Deserializer::from_reader(reader).into_iter::<Command>();
 
-    fn rem(&mut self, key: &str) -> Result<()> {
-        self.append(format!("rem,{}", key))?;
-        Ok(())
-    }
+        while let Some(cmd) = stream.next() {
+            let new_pos = stream.byte_offset() as u64;
 
-    fn get(&mut self, key: &str) -> Result<Option<String>> {
-        let content = self.read_to_string()?;
-        for line in content.lines().rev() {
-            if line.is_empty() || line == "\n" {
-                continue;
-            }
-            if let Ok(cmd) = self.deserialize_log(line) {
-                let (log_key, log_value) = match cmd {
-                    Command::Set { key, value } => (key, value),
-                    Command::Rem { key: _ } => return Ok(None),
-                };
-                if log_key == key {
-                    return Ok(Some(log_value));
+            match cmd? {
+                Command::Set { key, value: _ } => {
+                    self.index.insert(key, OffSet::new(pos, new_pos));
                 }
-            } else {
-                return Err(Error::from(ErrorKind::InvalidLog(format!(
-                    "invalid log {}",
-                    line
-                ))));
+                Command::Rem { key } => {
+                    self.index.remove(&key);
+                }
             }
+            pos = new_pos;
         }
-        Ok(None)
+
+        Ok(())
     }
 }
 
-fn new_db(file_path: &Path) -> Result<(BufReader<File>, BufWriter<File>)> {
-    let write_file = OpenOptions::new()
-        .write(true)
-        .append(true)
-        .create(true)
-        .open(&file_path)?;
-    let read_file = OpenOptions::new()
-        .write(false)
-        .read(true)
-        .open(&file_path)?;
-    let writer = BufWriter::new(write_file);
-    let reader = BufReader::new(read_file);
-    Ok((reader, writer))
+impl KvsEngine for Logger {
+    fn set(&mut self, key: String, value: String) -> Result<()> {
+        let command = Command::Set {
+            key: key.to_owned(),
+            value,
+        };
+        let offset = self.writer.write(command)?;
+        // update pointer of this command
+        self.index.insert(key, offset);
+        Ok(())
+    }
+
+    fn remove(&mut self, key: String) -> Result<()> {
+        // remove this key from index at first
+        if let None = self.index.remove(&key) {
+            return Err(Error::from(ErrorKind::KeyNotFound(format!(
+                "key: {} you want to remove not found",
+                key
+            ))));
+        }
+
+        let command = Command::Rem { key };
+        self.writer.write(command)?;
+
+        Ok(())
+    }
+
+    fn get(&mut self, key: String) -> Result<Option<String>> {
+        if let Some(offset) = self.index.get(&key) {
+            match self.reader.read(offset)? {
+                Command::Set {
+                    key: log_key,
+                    value: log_value,
+                } => {
+                    if log_key != key {
+                        Err(Error::from(ErrorKind::KeyNotFound(format!(
+                            "key: {} you want to get not found",
+                            key
+                        ))))
+                    } else {
+                        Ok(Some(log_value))
+                    }
+                }
+                Command::Rem { key: _ } => Err(Error::from(ErrorKind::KeyNotFound(format!(
+                    "key: {} you want to get not found",
+                    key
+                )))),
+            }
+        } else {
+            Ok(None)
+        }
+    }
 }

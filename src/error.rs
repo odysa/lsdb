@@ -21,10 +21,12 @@ pub enum ErrorKind {
     KeyNotFound(String),
 
     #[fail(display = "{}", _0)]
-    KeyNotExist(String),
-
-    #[fail(display = "{}", _0)]
     SerializerError(#[cause] serde_json::Error),
+}
+impl Error {
+    pub fn key_not_found(message: String) -> Self {
+        Error::from(ErrorKind::KeyNotFound(message))
+    }
 }
 
 impl Display for Error {

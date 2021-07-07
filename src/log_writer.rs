@@ -9,11 +9,12 @@ pub struct LogWriter {
 }
 
 impl LogWriter {
-    fn new(writer: PosWriter<File>) -> LogWriter {
-        LogWriter { writer, wild: 0 }
+    pub fn new(writer: BufWriter<File>) -> Result<LogWriter> {
+        let writer = PosWriter::new(writer)?;
+        Ok(LogWriter { writer, wild: 0 })
     }
 
-    fn write(&mut self, command: Command) -> Result<OffSet> {
+    pub fn write(&mut self, command: Command) -> Result<OffSet> {
         let pos = self.writer.pos;
         self.serialize(command)?;
 
@@ -44,11 +45,6 @@ impl<T: Write + Seek> PosWriter<T> {
     fn new(mut writer: BufWriter<T>) -> Result<Self> {
         let pos = writer.seek(SeekFrom::End(0))?;
         Ok(PosWriter { writer, pos })
-    }
-
-    fn write(&mut self, content: &[u8]) -> Result<u64> {
-        self.pos += self.writer.write(content)? as u64;
-        Ok(self.pos)
     }
 
     fn flush(&mut self) -> Result<()> {
