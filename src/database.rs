@@ -7,18 +7,18 @@ use std::collections::HashMap;
 use std::fs::OpenOptions;
 use std::io::{BufReader, BufWriter, SeekFrom};
 use std::path::{Path, PathBuf};
-pub struct Logger {
+pub struct DataBase {
     writer: DataBaseWriter,
     reader: DataBaseReader,
     index: HashMap<String, OffSet>,
 }
 
-impl Logger {
+impl DataBase {
     pub fn new(path: PathBuf) -> Result<Self> {
         let (reader, writer) = Self::new_db(&path)?;
         let index = HashMap::new();
 
-        let mut logger = Logger {
+        let mut logger = DataBase {
             writer,
             reader,
             index,
@@ -93,7 +93,7 @@ impl Logger {
     }
 }
 
-impl KvsEngine for Logger {
+impl KvsEngine for DataBase {
     fn set(&mut self, key: String, value: String) -> Result<()> {
         let command = Command::Set {
             key: key.to_owned(),
@@ -149,6 +149,11 @@ impl KvsEngine for Logger {
                     "key: {} you want to get not found",
                     key
                 )))),
+                _ => {
+                    return Err(Error::invalid_command(
+                        "command should not be written".to_string(),
+                    ))
+                }
             }
         } else {
             Ok(None)

@@ -1,5 +1,5 @@
 use crate::common::KvsEngine;
-use crate::database::Logger;
+use crate::database::DataBase;
 use crate::error::{Error, Result};
 use std::{collections::HashMap, path::Path};
 
@@ -20,10 +20,10 @@ pub struct KvStore<T: KvsEngine> {
     maintainer: T,
 }
 
-impl KvStore<Logger> {
+impl KvStore<DataBase> {
     pub fn open(path: &Path) -> Result<Self> {
         let path = path.join("kvs.db");
-        let maintainer = Logger::new(path)?;
+        let maintainer = DataBase::new(path)?;
         Ok(KvStore {
             maintainer,
             map: HashMap::new(),

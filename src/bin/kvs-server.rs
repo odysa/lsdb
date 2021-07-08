@@ -1,4 +1,5 @@
 use clap::{crate_authors, crate_version, Clap, Error, ErrorKind};
+use kvs::{kvs_store::KvStore, server::Server};
 use slog::*;
 use std::{env::current_dir, fs, net::SocketAddr, process::exit, str::FromStr};
 
@@ -91,7 +92,7 @@ fn current_engine(logger: &Logger) -> Result<Option<Engine>> {
 
     match fs::read_to_string(path)?.parse() {
         Ok(engine) => Ok(Some(engine)),
-        Err(e) => {
+        Err(_) => {
             warn!(logger, "unable to read engine");
             Ok(None)
         }
