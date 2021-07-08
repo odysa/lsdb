@@ -1,15 +1,15 @@
 use crate::error::{Error, ErrorKind, Result};
-use crate::log_reader::LogReader;
-use crate::log_writer::{LogWriter, OffSet};
-use crate::{Command, KvsEngine};
+use crate::kvs_store::{Command, KvsEngine};
+use crate::reader::DataBaseReader;
+use crate::writer::{DataBaseWriter, OffSet};
 use serde_json::Deserializer;
 use std::collections::HashMap;
 use std::fs::OpenOptions;
 use std::io::{BufReader, BufWriter, SeekFrom};
 use std::path::{Path, PathBuf};
 pub struct Logger {
-    writer: LogWriter,
-    reader: LogReader,
+    writer: DataBaseWriter,
+    reader: DataBaseReader,
     index: HashMap<String, OffSet>,
 }
 
@@ -27,7 +27,7 @@ impl Logger {
         Ok(logger)
     }
 
-    fn new_db(file_path: &Path) -> Result<(LogReader, LogWriter)> {
+    fn new_db(file_path: &Path) -> Result<(DataBaseReader, DataBaseWriter)> {
         let write_file = OpenOptions::new()
             .write(true)
             .create(true)
@@ -38,10 +38,10 @@ impl Logger {
             .open(&file_path)?;
 
         let writer = BufWriter::new(write_file);
-        let writer = LogWriter::new(writer)?;
+        let writer = DataBaseWriter::new(writer)?;
 
         let reader = BufReader::new(read_file);
-        let reader = LogReader::new(reader)?;
+        let reader = DataBaseReader::new(reader)?;
 
         Ok((reader, writer))
     }

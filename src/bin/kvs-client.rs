@@ -1,12 +1,14 @@
 use clap::{crate_authors, crate_version, Clap};
-use kvs::KvStore;
-use std::{path::Path, process};
+use kvs::kvs_store::KvStore;
+use std::{net::SocketAddr, path::Path, process};
 
 #[derive(Clap)]
 #[clap(version =crate_version!() , author = crate_authors!())]
 struct Options {
     #[clap(subcommand)]
     subcmd: SubCommand,
+    #[clap(long, short, default_value = "127.0.0.1:4000")]
+    addr: SocketAddr,
 }
 #[derive(Clap)]
 enum SubCommand {

@@ -1,20 +1,20 @@
 use crate::error::Result;
-use crate::Command;
+use crate::kvs_store::Command;
 use std::fs::File;
 use std::io::{BufWriter, Seek, SeekFrom, Write};
 
-pub struct LogWriter {
+pub struct DataBaseWriter {
     writer: PosWriter<File>,
     // length of content which is not compacted
     wild: u64,
 }
 
-impl LogWriter {
+impl DataBaseWriter {
     const COMPACT_THRESHOLD: u64 = 1 * 10 * 1024;
 
-    pub fn new(writer: BufWriter<File>) -> Result<LogWriter> {
+    pub fn new(writer: BufWriter<File>) -> Result<Self> {
         let writer = PosWriter::new(writer)?;
-        Ok(LogWriter { writer, wild: 0 })
+        Ok(DataBaseWriter { writer, wild: 0 })
     }
 
     pub fn flush(&mut self) -> Result<()> {

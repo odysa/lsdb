@@ -1,17 +1,17 @@
-use crate::{error::Result, log_writer::OffSet, Command};
+use crate::{error::Result, kvs_store::Command, writer::OffSet};
 use std::{
     fs::File,
     io::{BufReader, Read, Seek, SeekFrom},
 };
 
-pub struct LogReader {
+pub struct DataBaseReader {
     reader: PosReader<File>,
 }
 
-impl LogReader {
-    pub fn new(reader: BufReader<File>) -> Result<LogReader> {
+impl DataBaseReader {
+    pub fn new(reader: BufReader<File>) -> Result<DataBaseReader> {
         let reader = PosReader::new(reader)?;
-        Ok(LogReader { reader })
+        Ok(DataBaseReader { reader })
     }
 
     pub fn read(&mut self, offset: &OffSet) -> Result<Command> {
@@ -25,7 +25,7 @@ impl LogReader {
     }
 }
 
-impl Read for LogReader {
+impl Read for DataBaseReader {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         Ok(self.reader.read(buf)?)
     }
