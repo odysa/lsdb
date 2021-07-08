@@ -1,6 +1,6 @@
+use crate::common::KvsEngine;
 use crate::database::Logger;
 use crate::error::{Error, Result};
-use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::Path};
 
 /// Used to store key and value
@@ -82,15 +82,4 @@ impl<T: KvsEngine> KvStore<T> {
             Err(e) => Err(e),
         }
     }
-}
-#[derive(Debug, Serialize, Deserialize)]
-pub enum Command {
-    Set { key: String, value: String },
-    Rem { key: String },
-}
-
-pub trait KvsEngine {
-    fn get(&mut self, key: String) -> Result<Option<String>>;
-    fn set(&mut self, key: String, value: String) -> Result<()>;
-    fn remove(&mut self, key: String) -> Result<()>;
 }

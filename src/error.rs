@@ -15,7 +15,7 @@ pub enum ErrorKind {
     IO(#[cause] io::Error),
 
     #[fail(display = "{}", _0)]
-    InvalidLog(String),
+    InvalidCommand(String),
 
     #[fail(display = "{}", _0)]
     KeyNotFound(String),
@@ -26,6 +26,10 @@ pub enum ErrorKind {
 impl Error {
     pub fn key_not_found(message: String) -> Self {
         Error::from(ErrorKind::KeyNotFound(message))
+    }
+
+    pub fn invalid_command(message: String) -> Self {
+        Error::from(ErrorKind::InvalidCommand(message))
     }
 }
 
@@ -54,7 +58,7 @@ impl From<ErrorKind> for Error {
 impl From<Utf8Error> for Error {
     fn from(err: Utf8Error) -> Self {
         Error {
-            inner: Context::new(ErrorKind::InvalidLog(err.to_string())),
+            inner: Context::new(ErrorKind::InvalidCommand(err.to_string())),
         }
     }
 }

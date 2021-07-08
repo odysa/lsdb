@@ -1,5 +1,5 @@
-use crate::error::Result;
-use crate::kvs_store::Command;
+use crate::common::{Command, OffSet};
+use crate::error::{Error, Result};
 use std::fs::File;
 use std::io::{BufWriter, Seek, SeekFrom, Write};
 
@@ -37,10 +37,15 @@ impl DataBaseWriter {
 
         let offset = match command {
             Command::Set { key: _, value } => OffSet::new(pos, new_pos, Some(value)),
-            Command::Rem { key: _ } => OffSet::new(pos, new_pos, None),
+            Command::Remove { key: _ } => OffSet::new(pos, new_pos, None),
+            _ => {
+                return Err(Error::invalid_command(
+                    "command should not be written".to_string(),
+                ))
+            }
         };
 
-        self.wild += offset.len;
+        self.wild += offset.len();
 
         if !is_buffer {
             self.writer.flush()?;
@@ -102,43 +107,5 @@ impl<T: Write + Seek> Write for PosWriter<T> {
 
     fn flush(&mut self) -> std::io::Result<()> {
         self.writer.flush()
-    }
-}
-
-pub struct OffSet {
-    start: u64,
-    len: u64,
-    value: Option<String>,
-}
-
-impl Clone for OffSet {
-    fn clone(&self) -> Self {
-        OffSet {
-            start: self.start,
-            len: self.len,
-            value: self.value.to_owned(),
-        }
-    }
-}
-
-impl OffSet {
-    pub fn new(start: u64, end: u64, value: Option<String>) -> OffSet {
-        OffSet {
-            start,
-            len: end - start,
-            value,
-        }
-    }
-
-    pub fn start(&self) -> u64 {
-        self.start
-    }
-
-    pub fn len(&self) -> u64 {
-        self.len
-    }
-
-    pub fn value(&self) -> Option<String> {
-        self.value.to_owned()
     }
 }

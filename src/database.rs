@@ -1,7 +1,7 @@
+use crate::common::{Command, KvsEngine, OffSet};
 use crate::error::{Error, ErrorKind, Result};
-use crate::kvs_store::{Command, KvsEngine};
 use crate::reader::DataBaseReader;
-use crate::writer::{DataBaseWriter, OffSet};
+use crate::writer::DataBaseWriter;
 use serde_json::Deserializer;
 use std::collections::HashMap;
 use std::fs::OpenOptions;
@@ -58,9 +58,10 @@ impl Logger {
                     self.index
                         .insert(key, OffSet::new(pos, new_pos, Some(value)));
                 }
-                Command::Rem { key } => {
+                Command::Remove { key } => {
                     self.index.remove(&key);
                 }
+                _ => return Err(Error::invalid_command("invalid command parsed".to_string())),
             }
             pos = new_pos;
         }
@@ -118,7 +119,7 @@ impl KvsEngine for Logger {
             ))));
         }
 
-        let command = Command::Rem { key };
+        let command = Command::Remove { key };
         self.writer.write(command)?;
 
         Ok(())
@@ -144,7 +145,7 @@ impl KvsEngine for Logger {
                         Ok(Some(log_value))
                     }
                 }
-                Command::Rem { key: _ } => Err(Error::from(ErrorKind::KeyNotFound(format!(
+                Command::Remove { key: _ } => Err(Error::from(ErrorKind::KeyNotFound(format!(
                     "key: {} you want to get not found",
                     key
                 )))),

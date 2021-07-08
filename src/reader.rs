@@ -1,4 +1,7 @@
-use crate::{error::Result, kvs_store::Command, writer::OffSet};
+use crate::{
+    common::{Command, OffSet},
+    error::Result,
+};
 use std::{
     fs::File,
     io::{BufReader, Read, Seek, SeekFrom},
