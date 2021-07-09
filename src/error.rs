@@ -31,6 +31,9 @@ impl Error {
     pub fn invalid_command(message: String) -> Self {
         Error::from(ErrorKind::InvalidCommand(message))
     }
+    pub fn as_string(&self) -> String {
+        format!("{}", self)
+    }
 }
 
 impl Display for Error {

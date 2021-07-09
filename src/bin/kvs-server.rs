@@ -54,7 +54,7 @@ fn main() {
     });
 
     if let Err(e) = res {
-        error!(&logger, "{}", e);
+        error!(logger,"failed"; "error"=>e.to_string());
         exit(1);
     }
 }
@@ -83,8 +83,8 @@ fn run(engine: &Engine, addr: &SocketAddr, logger: &Logger) -> Result<()> {
         Engine::Kvs => {
             let path = Path::new(&current_dir);
             let store = KvStore::open(path)?;
-            let server = Server::new(store);
-            server.serve(addr)?;
+            let mut server = Server::new(store);
+            server.serve(addr, logger)?;
             Ok(())
         }
         Engine::Sled => Ok(()),

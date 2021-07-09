@@ -57,19 +57,19 @@ impl OffSet {
         self.value.to_owned()
     }
 }
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub enum GetResponse {
     Ok(Option<String>),
     Err(String),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub enum SetResponse {
     Ok(()),
     Err(String),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub enum RemoveResponse {
     Ok(()),
     Err(String),
