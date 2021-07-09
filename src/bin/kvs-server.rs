@@ -1,7 +1,7 @@
 use clap::{crate_authors, crate_version, Clap, Error, ErrorKind};
-use kvs::{kvs_store::KvStore, server::Server};
+use kvs::{error::Result, kvs_store::KvStore, server::Server};
 use slog::*;
-use std::{env::current_dir, fs, net::SocketAddr, process::exit, str::FromStr};
+use std::{env::current_dir, fs, net::SocketAddr, path::Path, process::exit, str::FromStr};
 
 #[derive(Clap)]
 #[clap(version =crate_version!() , author = crate_authors!())]
@@ -73,13 +73,20 @@ fn run(engine: &Engine, addr: &SocketAddr, logger: &Logger) -> Result<()> {
         "engine" => engine.to_string(),
          "ip" => addr
     );
+    let current_dir = current_dir()?;
     fs::write(
-        current_dir()?.join("engine"),
+        current_dir.join("engine"),
         format!("{}", engine.to_string()),
     )?;
 
     match engine {
-        Engine::Kvs => Ok(()),
+        Engine::Kvs => {
+            let path = Path::new(&current_dir);
+            let store = KvStore::open(path)?;
+            let server = Server::new(store);
+            server.serve(addr)?;
+            Ok(())
+        }
         Engine::Sled => Ok(()),
     }
 }

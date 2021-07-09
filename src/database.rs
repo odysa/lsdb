@@ -1,4 +1,4 @@
-use crate::common::{Command, KvsEngine, OffSet};
+use crate::common::{Command, DataBase, OffSet};
 use crate::error::{Error, ErrorKind, Result};
 use crate::reader::DataBaseReader;
 use crate::writer::DataBaseWriter;
@@ -7,18 +7,18 @@ use std::collections::HashMap;
 use std::fs::OpenOptions;
 use std::io::{BufReader, BufWriter, SeekFrom};
 use std::path::{Path, PathBuf};
-pub struct DataBase {
+pub struct LogDataBase {
     writer: DataBaseWriter,
     reader: DataBaseReader,
     index: HashMap<String, OffSet>,
 }
 
-impl DataBase {
+impl LogDataBase {
     pub fn new(path: PathBuf) -> Result<Self> {
         let (reader, writer) = Self::new_db(&path)?;
         let index = HashMap::new();
 
-        let mut logger = DataBase {
+        let mut logger = LogDataBase {
             writer,
             reader,
             index,
@@ -93,7 +93,7 @@ impl DataBase {
     }
 }
 
-impl KvsEngine for DataBase {
+impl DataBase for LogDataBase {
     fn set(&mut self, key: String, value: String) -> Result<()> {
         let command = Command::Set {
             key: key.to_owned(),

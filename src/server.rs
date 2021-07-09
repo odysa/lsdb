@@ -13,7 +13,7 @@ impl<T: KvsEngine> Server<T> {
         Server { engine }
     }
 
-    pub fn server(&self, addr: SocketAddr) -> Result<()> {
+    pub fn serve(&self, addr: &SocketAddr) -> Result<()> {
         let listener = TcpListener::bind(addr)?;
         for stream in listener.incoming() {
             self.handle_client(stream?)?;

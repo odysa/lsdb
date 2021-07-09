@@ -1,14 +1,12 @@
 use clap::{crate_authors, crate_version, Clap};
+use kvs::common::KvsEngine;
 use kvs::kvs_store::KvStore;
 use std::{net::SocketAddr, path::Path, process};
-
 #[derive(Clap)]
 #[clap(version =crate_version!() , author = crate_authors!())]
 struct Options {
     #[clap(subcommand)]
     subcmd: SubCommand,
-    #[clap(long, short, default_value = "127.0.0.1:4000")]
-    addr: SocketAddr,
 }
 #[derive(Clap)]
 enum SubCommand {
@@ -19,11 +17,15 @@ enum SubCommand {
 #[derive(Clap)]
 struct Key {
     key: String,
+    #[clap(long, short, default_value = "127.0.0.1:4000")]
+    addr: SocketAddr,
 }
 #[derive(Clap)]
 struct KeyValue {
     key: String,
     value: String,
+    #[clap(long, short, default_value = "127.0.0.1:4000")]
+    addr: SocketAddr,
 }
 fn main() {
     let opts = Options::parse();
@@ -41,7 +43,7 @@ fn main() {
         SubCommand::RM(m) => match kvs.remove(m.key) {
             Ok(_) => {}
             _ => {
-                println!("Key not found");
+                eprintln!("Key not found");
                 process::exit(-1);
             }
         },
