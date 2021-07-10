@@ -1,7 +1,9 @@
 use failure::{Context, Fail};
 use std::fmt::Display;
 use std::io;
+use std::num::TryFromIntError;
 use std::str::Utf8Error;
+use std::string::FromUtf8Error;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -22,6 +24,18 @@ pub enum ErrorKind {
 
     #[fail(display = "{}", _0)]
     SerializerError(#[cause] serde_json::Error),
+
+    #[fail(display = "{}", _0)]
+    Incomplete(String),
+
+    #[fail(display = "{}", _0)]
+    InvalidFormat(String),
+
+    #[fail(display = "{}", _0)]
+    TypeConversionFailed(TryFromIntError),
+
+    #[fail(display = "{}", _0)]
+    Utf8ConversionError(FromUtf8Error),
 }
 impl Error {
     pub fn key_not_found(message: String) -> Self {
@@ -70,6 +84,22 @@ impl From<serde_json::Error> for Error {
     fn from(err: serde_json::Error) -> Self {
         Error {
             inner: Context::new(ErrorKind::SerializerError(err)),
+        }
+    }
+}
+
+impl From<TryFromIntError> for Error {
+    fn from(err: TryFromIntError) -> Self {
+        Error {
+            inner: Context::new(ErrorKind::TypeConversionFailed(err)),
+        }
+    }
+}
+
+impl From<FromUtf8Error> for Error {
+    fn from(err: FromUtf8Error) -> Self {
+        Error {
+            inner: Context::new(ErrorKind::Utf8ConversionError(err)),
         }
     }
 }
