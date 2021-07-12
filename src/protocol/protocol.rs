@@ -2,10 +2,11 @@
 /// Check it out! ---> https://redis.io/topics/protocol
 use crate::error::{Error, ErrorKind, Result};
 use atoi::atoi;
-use bytes::{Buf, Bytes};
+use bytes::{Buf, Bytes, BytesMut};
 use std::convert::TryInto;
 use std::io::Cursor;
 use std::usize;
+
 pub enum Frame {
     Simple(String),
     Integers(u64),
@@ -23,7 +24,7 @@ impl Frame {
      * For Bulk Strings the first byte of the reply is "$"
      * For Arrays the first byte of the reply is "*"
      */
-    pub fn parse(msg: &mut Cursor<&[u8]>) -> Result<Frame> {
+    pub fn parse(msg: &mut Cursor<&BytesMut>) -> Result<Frame> {
         match get_u8(msg)? {
             b'+' => {
                 let line = get_line(msg)?;
@@ -57,7 +58,7 @@ impl Frame {
 
 // Gets an unsigned 8 bit integer from cursor of message.
 // The current position is advanced by 1
-fn get_u8(msg: &mut Cursor<&[u8]>) -> Result<u8> {
+fn get_u8(msg: &mut Cursor<&BytesMut>) -> Result<u8> {
     if !msg.has_remaining() {
         return Err(Error::from(ErrorKind::Incomplete(
             "incomplete frame".to_string(),
@@ -67,7 +68,7 @@ fn get_u8(msg: &mut Cursor<&[u8]>) -> Result<u8> {
     Ok(msg.get_u8())
 }
 
-fn peek_u8(msg: &mut Cursor<&[u8]>) -> Result<u8> {
+fn peek_u8(msg: &mut Cursor<&BytesMut>) -> Result<u8> {
     if !msg.has_remaining() {
         return Err(Error::from(ErrorKind::Incomplete(
             "incomplete frame".to_string(),
@@ -77,7 +78,7 @@ fn peek_u8(msg: &mut Cursor<&[u8]>) -> Result<u8> {
     Ok(msg.get_ref()[0])
 }
 
-fn get_line<'a>(msg: &mut Cursor<&'a [u8]>) -> Result<&'a [u8]> {
+fn get_line<'a>(msg: &mut Cursor<&'a BytesMut>) -> Result<&'a [u8]> {
     let begin = msg.position() as usize;
     let end = msg.get_ref().len() - 1;
     // read util \r\n
@@ -96,7 +97,7 @@ fn check_new_line(msg: &[u8]) -> bool {
     msg[0] == b'\r' && msg[1] == b'\n'
 }
 
-fn get_number(msg: &mut Cursor<&[u8]>) -> Result<u64> {
+fn get_number(msg: &mut Cursor<&BytesMut>) -> Result<u64> {
     let line = get_line(msg)?;
     atoi::<u64>(line).ok_or_else(|| {
         Error::from(ErrorKind::InvalidFormat(format!(

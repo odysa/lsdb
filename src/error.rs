@@ -36,6 +36,9 @@ pub enum ErrorKind {
 
     #[fail(display = "{}", _0)]
     Utf8ConversionError(FromUtf8Error),
+
+    #[fail(display = "{}", _0)]
+    Error(String),
 }
 impl Error {
     pub fn key_not_found(message: String) -> Self {
@@ -100,6 +103,14 @@ impl From<FromUtf8Error> for Error {
     fn from(err: FromUtf8Error) -> Self {
         Error {
             inner: Context::new(ErrorKind::Utf8ConversionError(err)),
+        }
+    }
+}
+
+impl From<String> for Error {
+    fn from(msg: String) -> Self {
+        Error {
+            inner: Context::new(ErrorKind::Error(msg)),
         }
     }
 }
