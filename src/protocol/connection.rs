@@ -1,4 +1,4 @@
-use std::io::Cursor;
+use std::io::{BufReader, Cursor};
 
 use bytes::{buf, Buf, BytesMut};
 use tokio::{
@@ -20,7 +20,7 @@ impl Connection {
     pub fn new(stream: TcpStream) -> Self {
         Connection {
             stream: BufWriter::new(stream),
-            buffer: BytesMut::with_capacity(4096),
+            buffer: BytesMut::with_capacity(1024 * 8),
             cursor: 0,
         }
     }
@@ -32,23 +32,17 @@ impl Connection {
             }
 
             // resise the buffer if it's full
-            if self.buffer.len() == self.cursor {
-                self.buffer.resize(self.cursor * 2, 0)
+            if 0 == self.stream.read_buf(&mut self.buffer).await? {
+                if self.buffer.is_empty() {
+                    return Ok(None);
+                }
             }
-            // read into buffer
-            let num = self.stream.read(&mut self.buffer[self.cursor..]).await?;
-            if num == 0 {
-                return if self.cursor == 0 {
-                    Ok(None)
-                } else {
-                    Err(Error::from("invalid connection".to_string()))
-                };
-            } else {
-                self.cursor += num;
-            }
+            // if still some bytes left in buffer and stream is empty,
+            // it means connection is closed
+            return Err(Error::from("connection is closed".to_string()));
         }
     }
-
+    // write frame to stream
     pub async fn write_frame(&mut self, frame: &Frame) -> Result<()> {
         match frame {
             Frame::Simple(val) => {
@@ -81,10 +75,11 @@ impl Connection {
         self.stream.flush().await?;
         Ok(())
     }
-
+    // parse buffer to Frame
     fn parse(&mut self) -> Result<Option<Frame>> {
         let mut buffer = Cursor::new(&self.buffer);
         let len = buffer.position() as usize;
+
         buffer.set_position(0);
         match Frame::parse(&mut buffer) {
             Ok(frame) => {
@@ -98,7 +93,7 @@ impl Connection {
     async fn put_new_line(&mut self) -> Result<()> {
         Ok(self.stream.write_all(b"\r\n").await?)
     }
-
+    // helper method to write decimal number to stream
     async fn write_number(&mut self, value: u64) -> Result<()> {
         use std::io::Write;
         let mut buffer = [0u8; 12];

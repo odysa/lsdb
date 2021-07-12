@@ -1,3 +1,4 @@
+use crossbeam::channel::SendError;
 use failure::{Context, Fail};
 use std::fmt::Display;
 use std::io;
@@ -39,6 +40,9 @@ pub enum ErrorKind {
 
     #[fail(display = "{}", _0)]
     Error(String),
+
+    #[fail(display = "{}", _0)]
+    ThreadPoolError(String),
 }
 impl Error {
     pub fn key_not_found(message: String) -> Self {
@@ -111,6 +115,16 @@ impl From<String> for Error {
     fn from(msg: String) -> Self {
         Error {
             inner: Context::new(ErrorKind::Error(msg)),
+        }
+    }
+}
+
+impl<T> From<SendError<T>> for Error {
+    fn from(_: SendError<T>) -> Self {
+        Error {
+            inner: Context::new(ErrorKind::ThreadPoolError(
+                "unable send job to thread pool!".to_string(),
+            )),
         }
     }
 }

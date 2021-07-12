@@ -2,3 +2,4 @@
 Cargo.lock
 *.db
 .idea
+/src/bin/test.rs
