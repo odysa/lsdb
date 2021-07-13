@@ -21,6 +21,7 @@ pub trait DataBase {
 }
 
 pub struct OffSet {
+    file_no: u64,
     start: u64,
     len: u64,
     value: Option<String>,
@@ -32,13 +33,15 @@ impl Clone for OffSet {
             start: self.start,
             len: self.len,
             value: self.value.to_owned(),
+            file_no: self.file_no,
         }
     }
 }
 
 impl OffSet {
-    pub fn new(start: u64, end: u64, value: Option<String>) -> OffSet {
+    pub fn new(file_no: u64, start: u64, end: u64, value: Option<String>) -> OffSet {
         OffSet {
+            file_no,
             start,
             len: end - start,
             value,

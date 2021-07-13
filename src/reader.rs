@@ -33,7 +33,7 @@ impl Read for DataBaseReader {
         Ok(self.reader.read(buf)?)
     }
 }
-struct PosReader<T: Seek + Read> {
+pub struct PosReader<T: Seek + Read> {
     reader: BufReader<T>,
     pos: u64,
 }
@@ -46,7 +46,7 @@ impl<T: Seek + Read> Seek for PosReader<T> {
 }
 
 impl<T: Seek + Read> PosReader<T> {
-    fn new(mut reader: BufReader<T>) -> Result<Self> {
+    pub fn new(mut reader: BufReader<T>) -> Result<Self> {
         let pos = reader.seek(SeekFrom::Start(0))?;
         Ok(PosReader { pos, reader })
     }
@@ -55,7 +55,7 @@ impl<T: Seek + Read> PosReader<T> {
         Ok(serde_json::from_slice(v)?)
     }
 
-    fn reader(&mut self) -> &mut BufReader<T> {
+    pub fn reader(&mut self) -> &mut BufReader<T> {
         self.reader.by_ref()
     }
 }

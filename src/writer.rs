@@ -71,22 +71,22 @@ impl DataBaseWriter {
         Ok(serde_json::to_writer(&mut self.writer, cmd)?)
     }
 }
-struct PosWriter<T: Write + Seek> {
+pub struct PosWriter<T: Write + Seek> {
     writer: BufWriter<T>,
     pos: u64,
 }
 
 impl<T: Write + Seek> PosWriter<T> {
-    fn new(mut writer: BufWriter<T>) -> Result<Self> {
+    pub fn new(mut writer: BufWriter<T>) -> Result<Self> {
         let pos = writer.seek(SeekFrom::End(0))?;
         Ok(PosWriter { writer, pos })
     }
 
-    fn flush(&mut self) -> Result<()> {
+    pub fn flush(&mut self) -> Result<()> {
         Ok(self.writer.flush()?)
     }
 
-    fn reset(&mut self) -> Result<u64> {
+    pub fn reset(&mut self) -> Result<u64> {
         Ok(self.seek(SeekFrom::Start(0))?)
     }
 }
