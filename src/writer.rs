@@ -36,8 +36,8 @@ impl DataBaseWriter {
         let new_pos = self.writer.pos;
 
         let offset = match command {
-            Command::Set { key: _, value } => OffSet::new(pos, new_pos, Some(value)),
-            Command::Remove { key: _ } => OffSet::new(pos, new_pos, None),
+            Command::Set { key: _, value } => OffSet::new(0, pos, new_pos),
+            Command::Remove { key: _ } => OffSet::new(0, pos, new_pos),
             _ => {
                 return Err(Error::invalid_command(
                     "command should not be written".to_string(),

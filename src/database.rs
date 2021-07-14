@@ -55,8 +55,7 @@ impl LogDataBase {
             let new_pos = stream.byte_offset() as u64;
             match cmd? {
                 Command::Set { key, value } => {
-                    self.index
-                        .insert(key, OffSet::new(pos, new_pos, Some(value)));
+                    self.index.insert(key, OffSet::new(0, pos, new_pos));
                 }
                 Command::Remove { key } => {
                     self.index.remove(&key);
@@ -69,28 +68,28 @@ impl LogDataBase {
         Ok(())
     }
 
-    fn compact(&mut self) -> Result<()> {
-        self.writer.seek(SeekFrom::Start(0))?;
-        let map = self.index.clone();
-        self.writer.reset()?;
+    // fn compact(&mut self) -> Result<()> {
+    //     self.writer.seek(SeekFrom::Start(0))?;
+    //     let map = self.index.clone();
+    //     self.writer.reset()?;
 
-        for (key, offset) in map.into_iter() {
-            if let Some(value) = offset.value() {
-                let new_offset = self.writer.write_buffer(Command::Set {
-                    key: key.to_owned(),
-                    value,
-                })?;
-                self.index.insert(key, new_offset);
-            } else {
-                self.index.remove(&key);
-            }
-        }
+    //     for (key, offset) in map.into_iter() {
+    //         if let Some(value) = offset.value() {
+    //             let new_offset = self.writer.write_buffer(Command::Set {
+    //                 key: key.to_owned(),
+    //                 value,
+    //             })?;
+    //             self.index.insert(key, new_offset);
+    //         } else {
+    //             self.index.remove(&key);
+    //         }
+    //     }
 
-        // println!("compacting!!!!");
-        self.writer.flush()?;
+    //     // println!("compacting!!!!");
+    //     self.writer.flush()?;
 
-        Ok(())
-    }
+    //     Ok(())
+    // }
 }
 
 impl DataBase for LogDataBase {
