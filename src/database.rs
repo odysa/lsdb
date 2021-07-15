@@ -102,9 +102,7 @@ impl DataBase for LogDataBase {
         // update pointer of this command
         self.index.insert(key, offset);
 
-        if self.writer.should_compact() {
-            self.compact()?;
-        }
+        if self.writer.should_compact() {}
 
         Ok(())
     }
@@ -126,10 +124,6 @@ impl DataBase for LogDataBase {
 
     fn get(&mut self, key: String) -> Result<Option<String>> {
         if let Some(offset) = self.index.get(&key) {
-            if let Some(value) = offset.value() {
-                return Ok(Some(value));
-            }
-
             match self.reader.read(offset)? {
                 Command::Set {
                     key: log_key,

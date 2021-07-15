@@ -89,6 +89,10 @@ impl<T: Write + Seek> PosWriter<T> {
     pub fn reset(&mut self) -> Result<u64> {
         Ok(self.seek(SeekFrom::Start(0))?)
     }
+    
+    pub fn pos(&self) -> u64 {
+        self.pos
+    }
 }
 
 impl<T: Seek + Write> Seek for PosWriter<T> {

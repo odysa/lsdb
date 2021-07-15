@@ -1,6 +1,5 @@
 use crate::common::{Command, KvsEngine, OffSet};
-use crate::database::LogDataBase;
-use crate::error::{Error, Result};
+use crate::error::{Error, ErrorKind, Result};
 use crate::reader::PosReader;
 use crate::writer::PosWriter;
 use serde_json::Deserializer;
@@ -36,10 +35,11 @@ pub struct KvStore {
 }
 
 impl KvStore {
+    const COMPACT_THRESHOLD: u64 = 8 * 1024 * 1024;
     pub fn open(path: &Path) -> Result<Self> {
         let path = path.join("");
         // create dir
-        fs::create_dir_all(path);
+        fs::create_dir_all(&path);
         // list of all db file numbers
         let db_list = KvStore::db_list(&path)?;
 
@@ -53,7 +53,7 @@ impl KvStore {
         // store all key and it's pointer in memory
         let mut index: HashMap<String, OffSet> = HashMap::new();
 
-        let store = KvStore {
+        let mut store = KvStore {
             path,
             readers,
             writer,
@@ -67,20 +67,15 @@ impl KvStore {
         for &db in &db_list {
             let file = File::open(KvStore::db_path(&mut store, db))?;
             let reader = BufReader::new(file);
-            let reader = PosReader::new(reader)?;
-            KvStore::load_from_db(&mut store, db, &mut reader, &mut index)?;
+            let mut reader = PosReader::new(reader)?;
+            KvStore::load_from_db(&mut store, db, &mut reader)?;
             store.readers.insert(db, reader);
         }
 
         Ok(store)
     }
 
-    fn load_from_db(
-        &mut self,
-        no: u64,
-        reader: &mut PosReader<File>,
-        index: &mut HashMap<String, OffSet>,
-    ) -> Result<u64> {
+    fn load_from_db(&mut self, no: u64, reader: &mut PosReader<File>) -> Result<u64> {
         // move to start of file
         let mut pos = reader.seek(SeekFrom::Start(0))?;
         let reader = reader.reader();
@@ -91,13 +86,13 @@ impl KvStore {
             let new_pos = stream.byte_offset() as u64;
             match cmd? {
                 Command::Set { key, value } => {
-                    if let Some(old_cmd) = index.insert(key, OffSet::new(no, pos, new_pos)) {
+                    if let Some(old_cmd) = self.index.insert(key, OffSet::new(no, pos, new_pos)) {
                         // size needed to be compacted
                         self.wild += old_cmd.len();
                     }
                 }
                 Command::Remove { key } => {
-                    if let Some(old_cmd) = index.remove(&key) {
+                    if let Some(old_cmd) = self.index.remove(&key) {
                         self.wild += old_cmd.len();
                     }
                     self.wild += new_pos - pos;
@@ -121,11 +116,11 @@ impl KvStore {
         let mut new_pos = 0;
         let mut compact_writer = self.new_db_writer(compact_no)?;
 
-        for cmd in &mut self.index.values() {
+        for cmd in &mut self.index.values_mut() {
             // get reader of given file
             let reader = self
                 .readers
-                .get(&cmd.no())
+                .get_mut(&cmd.no())
                 .expect(format!("unable to read file {}", cmd.no()).as_str());
 
             // to the start of given offset
@@ -136,11 +131,7 @@ impl KvStore {
             // write to
             let len = std::io::copy(&mut cmd_reader, &mut compact_writer)?;
             // update offset in memory
-            *cmd = OffSet {
-                file_no: compact_no,
-                start: new_pos,
-                len,
-            };
+            *cmd = OffSet::new(compact_no, new_pos, len + new_pos);
 
             new_pos += len;
         }
@@ -150,13 +141,13 @@ impl KvStore {
         let trash_db: Vec<_> = self
             .readers
             .keys()
-            .filter(|&&db| db < compact_no)
-            .clone()
+            .filter(|&&no| no < compact_no)
+            .cloned()
             .collect();
+
         for trash in trash_db {
             self.readers.remove(&trash);
-            // remove files
-            fs::remove_file(db_path(&self.path, *trash));
+            fs::remove_file(db_path(&self.path, trash))?;
         }
         Ok(())
     }
@@ -199,16 +190,13 @@ impl KvStore {
         let filter_invalid_file =
             |path: &PathBuf| path.is_file() && path.extension() == Some("db".as_ref());
 
-        // remove file extension which is .db
-        let remove_extension = |s: &str| s.trim_end_matches(".db");
-
         let str_to_u64 = str::parse::<u64>;
 
         // get number of file
         let file_name_to_no = |path: PathBuf| {
             path.file_name()
                 .and_then(OsStr::to_str)
-                .map(remove_extension)
+                .map(|s: &str| s.trim_end_matches(".db"))
                 .map(str_to_u64)
         };
 
@@ -232,46 +220,65 @@ impl KvsEngine for KvStore {
     /// ```
     /// ```
     fn set(&mut self, key: String, value: String) -> Result<()> {
-        self.map.insert(key.to_owned(), value.to_owned());
-        self.maintainer.set(key, value)?;
+        let cmd = Command::Set {
+            key: key.to_owned(),
+            value,
+        };
+        let current_pos = self.writer.pos();
+        serde_json::to_writer(&mut self.writer, &cmd)?;
+        self.writer.flush()?;
+
+        let offset = OffSet::new(self.current_no, current_pos, self.writer.pos());
+        if let Some(old_cmd) = self.index.insert(key, offset) {
+            self.wild += old_cmd.len();
+        }
+
+        if self.wild > KvStore::COMPACT_THRESHOLD {
+            self.compact()?;
+        }
+
         Ok(())
     }
     /// set the value of a given key
     /// ```
     /// ```
     fn get(&mut self, key: String) -> Result<Option<String>> {
-        if let Some(v) = self.map.get(&key) {
-            return Ok(Some(v.to_owned()));
-        }
-        match self.maintainer.get(key) {
-            Ok(res) => {
-                if let Some(value) = res {
-                    Ok(Some(value))
-                } else {
-                    Ok(None)
+        if let Some(offset) = self.index.get(&key) {
+            if let Some(reader) = self.readers.get_mut(&offset.no()) {
+                reader.seek(SeekFrom::Start(offset.start()))?;
+                let cmd_reader = reader.take(offset.len());
+                if let Command::Set { value, .. } = serde_json::from_reader(cmd_reader)? {
+                    return Ok(Some(value));
                 }
+                return Err(Error::from(ErrorKind::InvalidCommand(format!(
+                    "invalid command at {}",
+                    offset.no()
+                ))));
             }
-            Err(e) => Err(e),
         }
+        Err(Error::from(ErrorKind::KeyNotFound(format!(
+            "key {} not found",
+            key
+        ))))
     }
     /// remove a given key in store
     /// ```
     /// ```
     fn remove(&mut self, key: String) -> Result<String> {
-        self.map.remove(&key).unwrap_or_default();
-
-        match self.maintainer.get(key.to_owned()) {
-            Ok(res) => match res {
-                None => Err(Error::key_not_found(format!(
-                    "key {} you want to remove does not exist",
-                    key
-                ))),
-                Some(value) => {
-                    self.maintainer.remove(key)?;
-                    Ok(value)
-                }
-            },
-            Err(e) => Err(e),
+        let result = self.get(key.to_owned())?;
+        if let Some(value) = result {
+            let cmd = Command::Remove {
+                key: key.to_owned(),
+            };
+            serde_json::to_writer(&mut self.writer, &cmd)?;
+            self.writer.flush()?;
+            self.index.remove(&key);
+            Ok(value)
+        } else {
+            Err(Error::from(ErrorKind::KeyNotFound(format!(
+                "key {} not found",
+                key
+            ))))
         }
     }
 }
