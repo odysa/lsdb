@@ -5,7 +5,7 @@ use crate::writer::PosWriter;
 use serde_json::Deserializer;
 use std::ffi::OsStr;
 use std::fs::{self, DirEntry, File, OpenOptions};
-use std::io::{BufReader, BufWriter, Read, Seek, SeekFrom};
+use std::io::{Read, Seek, SeekFrom};
 use std::path::PathBuf;
 use std::{collections::HashMap, path::Path};
 
@@ -17,14 +17,13 @@ use std::{collections::HashMap, path::Path};
 /// use std::path::Path;
 /// use kvs::common::KvsEngine;
 ///
-/// let path = Path::new("");
+/// let path = Path::new("./db");
 /// let mut kvs = KvStore::open(path).unwrap();
 /// kvs.set("key".to_string(), "value".to_string()).unwrap();
 /// assert_eq!(kvs.get("key".to_string()).unwrap(),Some("value".to_string()));
 /// ```
 pub struct KvStore {
     path: PathBuf,
-    map: HashMap<String, String>,
     writer: PosWriter<File>,
     readers: HashMap<u64, PosReader<File>>,
     index: HashMap<String, OffSet>,
@@ -39,7 +38,7 @@ impl KvStore {
     pub fn open(path: &Path) -> Result<Self> {
         let path = path.join("");
         // create dir
-        fs::create_dir_all(&path);
+        fs::create_dir_all(&path)?;
         // list of all db file numbers
         let db_list = KvStore::db_list(&path)?;
 
@@ -47,27 +46,26 @@ impl KvStore {
         let current_no = db_list.last().unwrap_or(&0) + 1;
 
         let writer = new_db_writer(&path, current_no)?;
-
         let readers = HashMap::<u64, PosReader<File>>::new();
-
         // store all key and it's pointer in memory
-        let mut index: HashMap<String, OffSet> = HashMap::new();
+        let index: HashMap<String, OffSet> = HashMap::new();
 
         let mut store = KvStore {
             path,
             readers,
             writer,
-            map: HashMap::new(),
             index,
             current_no,
             wild: 0,
         };
+        // insert current new db reader to readers
+        let current_reader = store.new_db_reader(current_no)?;
+        store.readers.insert(current_no, current_reader);
 
         // read data into memory from db files
         for &db in &db_list {
             let file = File::open(KvStore::db_path(&mut store, db))?;
-            let reader = BufReader::new(file);
-            let mut reader = PosReader::new(reader)?;
+            let mut reader = PosReader::new(file)?;
             KvStore::load_from_db(&mut store, db, &mut reader)?;
             store.readers.insert(db, reader);
         }
@@ -85,7 +83,7 @@ impl KvStore {
         while let Some(cmd) = stream.next() {
             let new_pos = stream.byte_offset() as u64;
             match cmd? {
-                Command::Set { key, value } => {
+                Command::Set { key, .. } => {
                     if let Some(old_cmd) = self.index.insert(key, OffSet::new(no, pos, new_pos)) {
                         // size needed to be compacted
                         self.wild += old_cmd.len();
@@ -108,13 +106,14 @@ impl KvStore {
     pub fn compact(&mut self) -> Result<()> {
         // number of file to compact
         let compact_no = self.current_no + 1;
-        // skip current new file
-        self.current_no += 2;
-        // write to new file
-        self.writer = self.new_db_writer(self.current_no)?;
+        let mut compact_writer = self.next_nth_db(1)?;
+
+        // skip compact file
+        self.writer = self.next_nth_db(1)?;
+
+        // self.new_db(self.current_no)?;
 
         let mut new_pos = 0;
-        let mut compact_writer = self.new_db_writer(compact_no)?;
 
         for cmd in &mut self.index.values_mut() {
             // get reader of given file
@@ -152,31 +151,27 @@ impl KvStore {
         Ok(())
     }
 
-    fn new_db(file_path: &Path) -> Result<(PosReader<File>, PosWriter<File>)> {
-        let write_file = OpenOptions::new()
-            .write(true)
-            .create(true)
-            .open(&file_path)?;
-
-        let read_file = OpenOptions::new()
-            .write(false)
-            .read(true)
-            .open(&file_path)?;
-
-        let writer = BufWriter::new(write_file);
-        let writer = PosWriter::new(writer)?;
-
-        let reader = BufReader::new(read_file);
-        let reader = PosReader::new(reader)?;
-
-        Ok((reader, writer))
+    // create next nth db file
+    fn next_nth_db(&mut self, n: u64) -> Result<PosWriter<File>> {
+        self.current_no += n;
+        self.new_db(self.current_no)
     }
+    // create a new db file and return writer to it
+    fn new_db(&mut self, no: u64) -> Result<PosWriter<File>> {
+        let writer = self.new_db_writer(no)?;
+        let reader = self.new_db_reader(no)?;
+        self.readers.insert(no, reader);
 
+        Ok(writer)
+    }
     // get writer of new db file
     fn new_db_writer(&mut self, no: u64) -> Result<PosWriter<File>> {
         Ok(new_db_writer(&self.path, no)?)
     }
 
+    fn new_db_reader(&mut self, no: u64) -> Result<PosReader<File>> {
+        Ok(new_db_reader(&self.path, no)?)
+    }
     // get db file path by no
     fn db_path(&mut self, no: u64) -> PathBuf {
         self.path.join(format!("{}.db", no))
@@ -200,7 +195,7 @@ impl KvStore {
                 .map(str_to_u64)
         };
 
-        let mut list = fs::read_dir(path)?
+        let list = fs::read_dir(path)?
             .flat_map(take_entry)
             .filter(filter_invalid_file)
             .flat_map(file_name_to_no)
@@ -251,15 +246,14 @@ impl KvsEngine for KvStore {
                     return Ok(Some(value));
                 }
                 return Err(Error::from(ErrorKind::InvalidCommand(format!(
-                    "invalid command at {}",
-                    offset.no()
+                    "invalid command at db file:{}, position:{}",
+                    offset.no(),
+                    offset.start()
                 ))));
             }
         }
-        Err(Error::from(ErrorKind::KeyNotFound(format!(
-            "key {} not found",
-            key
-        ))))
+
+        Ok(None)
     }
     /// remove a given key in store
     /// ```
@@ -284,18 +278,23 @@ impl KvsEngine for KvStore {
 }
 
 fn new_db_writer(path: &PathBuf, no: u64) -> Result<PosWriter<File>> {
-    // get path to given db file
     let path = db_path(path, no);
     let writer = OpenOptions::new()
         .create(true)
         .write(true)
         .append(true)
         .open(&path)?;
-    let writer = BufWriter::new(writer);
     let writer = PosWriter::new(writer)?;
     Ok(writer)
 }
 
+fn new_db_reader(path: &PathBuf, no: u64) -> Result<PosReader<File>> {
+    let path = db_path(path, no);
+    let file = OpenOptions::new().read(true).write(false).open(&path)?;
+    let reader = PosReader::new(file)?;
+    Ok(reader)
+}
+// get path to given db file
 fn db_path(path: &PathBuf, no: u64) -> PathBuf {
     path.join(format!("{}.db", no))
 }

@@ -19,7 +19,7 @@ pub trait DataBase {
     fn set(&mut self, key: String, value: String) -> Result<()>;
     fn remove(&mut self, key: String) -> Result<()>;
 }
-
+#[derive(Debug)]
 pub struct OffSet {
     file_no: u64,
     start: u64,

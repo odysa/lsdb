@@ -25,23 +25,23 @@ impl Connection {
         }
     }
 
-    pub async fn read_frame(&mut self) -> Result<Option<Frame>> {
-        loop {
-            if let Some(frame) = self.parse()? {
-                return Ok(Some(frame));
-            }
+    // pub async fn read_frame(&mut self) -> Result<Option<Frame>> {
+    //     loop {
+    //         if let Some(frame) = self.parse()? {
+    //             return Ok(Some(frame));
+    //         }
 
-            // resise the buffer if it's full
-            if 0 == self.stream.read_buf(&mut self.buffer).await? {
-                if self.buffer.is_empty() {
-                    return Ok(None);
-                }
-            }
-            // if still some bytes left in buffer and stream is empty,
-            // it means connection is closed
-            return Err(Error::from("connection is closed".to_string()));
-        }
-    }
+    //         // resise the buffer if it's full
+    //         if 0 == self.stream.read_buf(&mut self.buffer).await? {
+    //             if self.buffer.is_empty() {
+    //                 return Ok(None);
+    //             }
+    //         }
+    //         // if still some bytes left in buffer and stream is empty,
+    //         // it means connection is closed
+    //         return Err(Error::from("connection is closed".to_string()));
+    //     }
+    // }
     // write frame to stream
     pub async fn write_frame(&mut self, frame: &Frame) -> Result<()> {
         match frame {
