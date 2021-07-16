@@ -19,11 +19,11 @@ pub trait DataBase {
     fn set(&mut self, key: String, value: String) -> Result<()>;
     fn remove(&mut self, key: String) -> Result<()>;
 }
-
+#[derive(Debug)]
 pub struct OffSet {
+    file_no: u64,
     start: u64,
     len: u64,
-    value: Option<String>,
 }
 
 impl Clone for OffSet {
@@ -31,17 +31,17 @@ impl Clone for OffSet {
         OffSet {
             start: self.start,
             len: self.len,
-            value: self.value.to_owned(),
+            file_no: self.file_no,
         }
     }
 }
 
 impl OffSet {
-    pub fn new(start: u64, end: u64, value: Option<String>) -> OffSet {
+    pub fn new(file_no: u64, start: u64, end: u64) -> OffSet {
         OffSet {
+            file_no,
             start,
             len: end - start,
-            value,
         }
     }
 
@@ -53,8 +53,8 @@ impl OffSet {
         self.len
     }
 
-    pub fn value(&self) -> Option<String> {
-        self.value.to_owned()
+    pub fn no(&self) -> u64 {
+        self.file_no
     }
 }
 #[derive(Debug, Serialize)]

@@ -29,7 +29,7 @@ struct KeyValue {
 }
 fn main() {
     let opts = Options::parse();
-    let mut kvs = KvStore::open(Path::new("")).unwrap();
+    let mut kvs = KvStore::open(Path::new("./db")).unwrap();
     match opts.subcmd {
         SubCommand::Get(m) => match kvs.get(m.key) {
             Ok(Some(value)) => {
