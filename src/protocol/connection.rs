@@ -1,12 +1,12 @@
-use std::io::{BufReader, Cursor};
+use std::io::Cursor;
 
-use bytes::{buf, Buf, BytesMut};
+use bytes::{Buf, BytesMut};
 use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt, BufWriter},
+    io::{AsyncWriteExt, BufWriter},
     net::TcpStream,
 };
 
-use crate::error::{Error, Result};
+use crate::error::Result;
 
 use super::protocol::Frame;
 

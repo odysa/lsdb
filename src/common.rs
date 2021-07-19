@@ -57,20 +57,3 @@ impl OffSet {
         self.file_no
     }
 }
-#[derive(Debug, Serialize)]
-pub enum GetResponse {
-    Ok(Option<String>),
-    Err(String),
-}
-
-#[derive(Debug, Serialize)]
-pub enum SetResponse {
-    Ok(()),
-    Err(String),
-}
-
-#[derive(Debug, Serialize)]
-pub enum RemoveResponse {
-    Ok(()),
-    Err(String),
-}
