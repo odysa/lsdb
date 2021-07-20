@@ -1,4 +1,4 @@
-mod client;
+pub mod client;
 pub mod common;
 mod database;
 pub mod error;

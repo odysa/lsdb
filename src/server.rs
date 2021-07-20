@@ -1,6 +1,7 @@
 use crate::common::KvsEngine;
 use crate::error::Result;
 use crate::net::{Request, Response};
+use crate::thread_pool::{QueueThreadPool, ThreadPool};
 use serde_json::Deserializer;
 use slog::{debug, error, info, Logger};
 use std::io::{BufReader, BufWriter, Write};
@@ -15,12 +16,14 @@ impl<T: KvsEngine> Server<T> {
     }
 
     pub fn serve(&mut self, addr: &SocketAddr, logger: &Logger) -> Result<()> {
+        let pool = QueueThreadPool::new(10)?;
         let listener = TcpListener::bind(addr)?;
         for stream in listener.incoming() {
             self.handle_client(stream?, logger)?;
         }
         Ok(())
     }
+    
     fn handle_client(&mut self, stream: TcpStream, logger: &Logger) -> Result<()> {
         let peer_addr = stream.peer_addr()?;
         let reader = BufReader::new(&stream);
