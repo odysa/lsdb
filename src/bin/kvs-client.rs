@@ -1,7 +1,6 @@
 use clap::{crate_authors, crate_version, Clap};
-use kvs::common::KvsEngine;
-use kvs::kvs_store::KvStore;
-use std::{net::SocketAddr, path::Path, process};
+use kvs::client::Client;
+use std::{net::SocketAddr, process};
 #[derive(Clap)]
 #[clap(version =crate_version!() , author = crate_authors!())]
 struct Options {
@@ -29,30 +28,38 @@ struct KeyValue {
 }
 fn main() {
     let opts = Options::parse();
-    let mut kvs = KvStore::open(Path::new("./db")).unwrap();
     match opts.subcmd {
-        SubCommand::Get(m) => match kvs.get(m.key) {
-            Ok(Some(value)) => {
-                println!("{}", value);
+        SubCommand::Get(m) => {
+            let mut client = Client::connect(m.addr).expect("cannot connect to server");
+            match client.get(m.key) {
+                Ok(Some(value)) => {
+                    println!("{}", value);
+                }
+                _ => {
+                    println!("Key not found");
+                    process::exit(0);
+                }
             }
-            _ => {
-                println!("Key not found");
-                process::exit(0);
+        }
+        SubCommand::RM(m) => {
+            let mut client = Client::connect(m.addr).expect("cannot connect to server");
+            match client.remove(m.key) {
+                Ok(_) => {}
+                _ => {
+                    eprintln!("Key not found");
+                    process::exit(-1);
+                }
             }
-        },
-        SubCommand::RM(m) => match kvs.remove(m.key) {
-            Ok(_) => {}
-            _ => {
-                eprintln!("Key not found");
-                process::exit(-1);
+        }
+        SubCommand::Set(m) => {
+            let mut client = Client::connect(m.addr).expect("cannot connect to server");
+            match client.set(m.key, m.value) {
+                Ok(_) => {}
+                Err(e) => {
+                    println!("{}", e);
+                    process::exit(-1);
+                }
             }
-        },
-        SubCommand::Set(m) => match kvs.set(m.key, m.value) {
-            Ok(_) => {}
-            Err(e) => {
-                println!("{}", e);
-                process::exit(-1);
-            }
-        },
+        }
     }
 }

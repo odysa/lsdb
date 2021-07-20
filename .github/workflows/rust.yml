@@ -13,7 +13,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        build: [stable, beta, nightly, macos, windows, msrv]
+        build: [stable, beta, nightly]
         include:
           - build: stable
             os: ubuntu-latest
@@ -24,15 +24,7 @@ jobs:
           - build: nightly
             os: ubuntu-latest
             rust: nightly
-          - build: macos
-            os: macos-latest
-            rust: stable
-          - build: windows
-            os: windows-latest
-            rust: stable
-          - build: msrv
-            os: ubuntu-latest
-            rust: stable
+
     steps:
     - uses: actions/checkout@master
     - name: Install Rust
