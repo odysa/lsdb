@@ -1,5 +1,10 @@
 use clap::{crate_authors, crate_version, Clap, Error, ErrorKind};
-use kvs::{error::Result, kvs_store::KvStore, server::Server};
+use kvs::{
+    error::Result,
+    kvs_store::KvStore,
+    server::Server,
+    thread_pool::{QueueThreadPool, ThreadPool},
+};
 use slog::*;
 use std::{env::current_dir, fs, net::SocketAddr, path::Path, process::exit, str::FromStr};
 
@@ -34,11 +39,19 @@ impl FromStr for Engine {
 impl Engine {
     fn to_string(&self) -> String {
         match self {
-            &Engine::Kvs => "kvs".to_string(),
-            &Engine::Sled => "sled".to_string(),
+            Engine::Kvs => "kvs".to_string(),
+            Engine::Sled => "sled".to_string(),
         }
     }
 }
+// impl Display for Engine {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         match self {
+//             Engine::Kvs => "kvs".to_string(),
+//             Engine::Sled => "sled".to_string(),
+//         }
+//     }
+// }
 fn main() {
     let logger = logger();
     let options = Options::parse();
@@ -50,11 +63,10 @@ fn main() {
             error!(&logger, "Wrong engine!");
             exit(1);
         }
-        run(&engine, &addr, &logger)
+        run(&engine, &addr, logger)
     });
 
-    if let Err(e) = res {
-        error!(logger,"failed"; "error"=>e.to_string());
+    if res.is_err() {
         exit(1);
     }
 }
@@ -67,23 +79,21 @@ fn logger() -> slog::Logger {
     slog::Logger::root(drain, o!())
 }
 
-fn run(engine: &Engine, addr: &SocketAddr, logger: &Logger) -> Result<()> {
+fn run(engine: &Engine, addr: &SocketAddr, logger: Logger) -> Result<()> {
     info!(logger, "YaKvs initializing";
         "version" => crate_version!(),
         "engine" => engine.to_string(),
          "ip" => addr
     );
     let current_dir = current_dir()?;
-    fs::write(
-        current_dir.join("engine"),
-        format!("{}", engine.to_string()),
-    )?;
+    fs::write(current_dir.join("engine"), engine.to_string())?;
 
     match engine {
         Engine::Kvs => {
             let path = Path::new(&current_dir);
             let store = KvStore::open(path)?;
-            let mut server = Server::new(store);
+            let thread_pool = QueueThreadPool::new(10)?;
+            let mut server = Server::new(store, thread_pool);
             server.serve(addr, logger)?;
             Ok(())
         }

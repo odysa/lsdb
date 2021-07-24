@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use kvs::{common::KvsEngine, error::Result, kvs_store::KvStore};
 use tempfile::TempDir;
 use walkdir::WalkDir;
@@ -117,7 +119,7 @@ fn compaction() -> Result<()> {
         let mut store = KvStore::open(temp_dir.path())?;
         for key_id in 0..1000 {
             let key = format!("key{}", key_id);
-            assert_eq!(store.get(key)?, Some(format!("{}", iter)));
+            assert_eq!(store.get(key.to_owned())?, Some(format!("{}", iter)));
         }
         return Ok(());
     }
