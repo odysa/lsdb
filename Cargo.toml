@@ -26,3 +26,7 @@ predicates = "2.0.0"
 rand = "0.8.4"
 tempfile = "3.0.7"
 walkdir = "2.2.7"
+
+[[bench]]
+name = "kvs_benchmark"
+harness = false

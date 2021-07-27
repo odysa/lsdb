@@ -67,6 +67,7 @@ fn main() {
     });
 
     if res.is_err() {
+        println!("server failed {:?}", res);
         exit(1);
     }
 }
@@ -86,6 +87,8 @@ fn run(engine: &Engine, addr: &SocketAddr, logger: Logger) -> Result<()> {
          "ip" => addr
     );
     let current_dir = current_dir()?;
+    let current_dir = current_dir.join("./db");
+    fs::create_dir_all(&current_dir)?;
     fs::write(current_dir.join("engine"), engine.to_string())?;
 
     match engine {
@@ -102,7 +105,7 @@ fn run(engine: &Engine, addr: &SocketAddr, logger: Logger) -> Result<()> {
 }
 
 fn current_engine(logger: &Logger) -> Result<Option<Engine>> {
-    let path = current_dir()?.join("engine");
+    let path = current_dir()?.join("./db/engine");
     if !path.exists() {
         return Ok(None);
     }
