@@ -8,7 +8,7 @@ use tokio::{
 
 use crate::error::Result;
 
-use super::protocol::Frame;
+use super::frame::Frame;
 
 struct Connection {
     stream: BufWriter<TcpStream>,
