@@ -1,10 +1,5 @@
 # Yet another kvs store
 
-## build
-```rust
-cargo build
-```
-
 ## run
 Launch server first
 ```
@@ -20,4 +15,17 @@ available commands:
 set key value
 rm key
 get key
+```
+
+## build
+```
+cargo build
+```
+## benchmark
+```
+cargo bench
+```
+## test
+```
+cargo test
 ```
