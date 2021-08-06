@@ -1,7 +1,5 @@
 use assert_cmd::prelude::*;
-use std::sync::mpsc;
-use std::thread;
-use std::{process::Command, time::Duration};
+use std::process::Command;
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use kvs::{common::KvsEngine, kvs_store::KvStore};
@@ -14,7 +12,7 @@ pub fn store_bench(c: &mut Criterion) {
         b.iter(|| {
             let dir = TempDir::new().unwrap();
             let path = dir.path();
-            let mut kvs = KvStore::open(path).unwrap();
+            let kvs = KvStore::open(path).unwrap();
             for j in 0..*i {
                 kvs.set(format!("key{}", j), format!("value{}", j)).unwrap();
                 if j - 1 >= 0 {
@@ -28,18 +26,7 @@ pub fn store_bench(c: &mut Criterion) {
 pub fn server_bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("server_bench");
 
-    group.bench_with_input(BenchmarkId::new("kvs", 1), &100000, |b, i| {
-        // let (sender, receiver) = mpsc::sync_channel::<i32>(0);
-        // let temp_dir = TempDir::new().unwrap();
-        // let mut server = Command::cargo_bin("kvs-server").unwrap();
-        // let mut child = server.current_dir(&temp_dir).spawn().unwrap();
-
-        // let handle = thread::spawn(move || {
-        //     // wait for main thread to finish
-        //     let _ = receiver.recv();
-        //     child.kill().expect("server exited before killed");
-        // });
-
+    group.bench_with_input(BenchmarkId::new("kvs", 1), &10, |b, i| {
         b.iter(|| {
             for j in 0..*i {
                 set(format!("key{}", j), format!("value{}", j));
@@ -48,9 +35,6 @@ pub fn server_bench(c: &mut Criterion) {
                 }
             }
         });
-        // println!("do");
-        // sender.send(0).unwrap();
-        // handle.join().unwrap();
     });
 }
 

@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use std::fs::OpenOptions;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum Request {

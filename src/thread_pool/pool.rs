@@ -1,7 +1,7 @@
 use super::{supervisor::Supervisor, Message, ThreadPool};
 use crate::error::Error;
 use crossbeam::channel::{unbounded, Receiver, Sender};
-use std::thread::{self, JoinHandle};
+use std::thread;
 pub struct QueueThreadPool {
     sender: Sender<Message>,
     supervisor_sender: Sender<Message>,
@@ -17,6 +17,7 @@ impl ThreadPool for QueueThreadPool {
         let (worker_sender, worker_receiver) = unbounded::<Message>();
         let pool_supervisor_sender = supervisor_sender.clone();
 
+        // launch a new thread to run supervisor
         thread::spawn(move || {
             let mut supervisor = Supervisor::new(
                 supervisor_receiver,
@@ -85,44 +86,11 @@ impl JobReceiver {
 
 impl Drop for JobReceiver {
     fn drop(&mut self) {
+        // revive a thread
         if thread::panicking() {
             self.notifier
                 .send(Message::Dead(self.id))
                 .expect("unable to revive thread: cannot send message to supervisor");
-        }
-    }
-}
-
-pub struct Worker {
-    id: usize,
-    thread: Option<JoinHandle<()>>,
-}
-
-impl Worker {
-    pub fn new(id: usize, receiver: JobReceiver) -> Worker {
-        let thread = thread::spawn(move || {
-            do_job(receiver);
-        });
-
-        Worker {
-            id,
-            thread: Some(thread),
-        }
-    }
-}
-
-// complete job
-fn do_job(receiver: JobReceiver) {
-    // listen to job message
-    loop {
-        if let Ok(message) = receiver.receiver().recv() {
-            match message {
-                Message::Dead(_) => break,
-                Message::Work(job) => {
-                    job();
-                }
-                Message::Terminate => break,
-            }
         }
     }
 }

@@ -19,7 +19,7 @@ impl<T: Seek + Read> Seek for PosReader<T> {
 }
 
 impl<T: Seek + Read> PosReader<T> {
-    pub fn new(mut content: T) -> Result<Self> {
+    pub fn new(content: T) -> Result<Self> {
         let mut reader = BufReader::new(content);
         let pos = reader.seek(SeekFrom::Start(0))?;
         Ok(PosReader { pos, reader })

@@ -3,7 +3,7 @@ use crate::error::Result;
 use crate::net::{Request, Response};
 use crate::thread_pool::ThreadPool;
 use serde_json::Deserializer;
-use slog::{error, info, o, Logger};
+use slog::{error, o, Logger};
 use std::io::{BufReader, BufWriter, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::sync::Arc;
@@ -56,8 +56,6 @@ fn handle_client<T: KvsEngine>(engine: T, stream: TcpStream, logger: &Logger) ->
 
     for request in requests {
         if let Ok(request) = request {
-            info!(logger,"request:"; "request" => format!("{:?}", request));
-
             let response = match request {
                 Request::Get { key } => match engine.get(key) {
                     Ok(v) => Response::Get(Ok(v)),
@@ -74,12 +72,6 @@ fn handle_client<T: KvsEngine>(engine: T, stream: TcpStream, logger: &Logger) ->
             };
 
             send_response(&mut writer, &response)?;
-
-            info!(
-                logger,
-                "Response sent";
-                "response" => format!("{:?}",response)
-            );
             // write response
         } else {
             error!(logger, "can not parse the request");

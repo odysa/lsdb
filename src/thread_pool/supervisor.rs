@@ -1,9 +1,6 @@
+use super::{pool::JobReceiver, Message};
 use crossbeam::channel::{Receiver, Sender};
-
-use super::{
-    pool::{JobReceiver, Worker},
-    Message,
-};
+use std::thread::{self, JoinHandle};
 /// It supervises workers
 pub struct Supervisor {
     workers: Vec<Worker>,
@@ -51,6 +48,40 @@ impl Supervisor {
                 Message::Terminate => {
                     break;
                 }
+            }
+        }
+    }
+}
+
+pub struct Worker {
+    id: usize,
+    thread: Option<JoinHandle<()>>,
+}
+
+impl Worker {
+    pub fn new(id: usize, receiver: JobReceiver) -> Worker {
+        let thread = thread::spawn(move || {
+            do_job(receiver);
+        });
+
+        Worker {
+            id,
+            thread: Some(thread),
+        }
+    }
+}
+
+// complete job
+fn do_job(receiver: JobReceiver) {
+    // listen to job message
+    loop {
+        if let Ok(message) = receiver.receiver().recv() {
+            match message {
+                Message::Dead(_) => break,
+                Message::Work(job) => {
+                    job();
+                }
+                Message::Terminate => break,
             }
         }
     }

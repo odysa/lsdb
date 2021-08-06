@@ -31,12 +31,12 @@ pub struct KvStore {
     index: Arc<RwLock<HashMap<String, OffSet>>>,
     // current number of database file
     current_no: Arc<AtomicU64>,
-    // how many bytes not compacted
+    // how many bytes which are not compacted
     wild: Arc<AtomicU64>,
 }
 
 impl KvStore {
-    const COMPACT_THRESHOLD: u64 = 8 * 1024 * 1024;
+    const COMPACT_THRESHOLD: u64 = 100 * 1024 * 1024;
     pub fn open(path: &Path) -> Result<Self> {
         let path = path.join("");
         // create dir
@@ -114,7 +114,7 @@ impl KvStore {
 
         Ok(())
     }
-
+    // compact db files to single one, and remove redundant entries
     pub fn compact(&self) -> Result<()> {
         // number of file to compact
         let compact_no = self.current_no.load(Ordering::SeqCst) + 1;
@@ -217,6 +217,7 @@ impl KvStore {
             .flatten()
             .collect();
 
+        // sort to process in sequence
         list.sort_unstable();
         Ok(list)
     }
