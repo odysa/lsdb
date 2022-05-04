@@ -1,11 +1,15 @@
-# Yet another kvs store
+# LSDB
+
+A LSM based key-value Storage that supports compaction.
 
 ## run
-Launch server first
+
+Launch server
 ```
 cargo run --bin kvs-server --addr 127.0.0.1:4000
 ```
-then launch client
+
+launch client
 ```
 cargo run --bin kvs-client set key value --addr 127.0.0.1:4000
 ```
